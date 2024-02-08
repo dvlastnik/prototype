@@ -13,6 +13,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "KSPEnumCodelab"
+rootProject.name = "ksp_example"
 include(":app")
- 

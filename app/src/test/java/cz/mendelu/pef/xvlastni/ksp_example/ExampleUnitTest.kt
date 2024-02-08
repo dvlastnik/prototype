@@ -1,4 +1,4 @@
-package com.ptut.kspenumcodelab
+package cz.mendelu.pef.xvlastni.ksp_example
 
 import org.junit.Test
 

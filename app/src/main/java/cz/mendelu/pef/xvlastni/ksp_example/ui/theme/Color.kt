@@ -1,4 +1,4 @@
-package com.ptut.kspenumcodelab.ui.theme
+package cz.mendelu.pef.xvlastni.ksp_example.ui.theme
 
 import androidx.compose.ui.graphics.Color
 

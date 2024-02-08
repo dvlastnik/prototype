@@ -1,4 +1,4 @@
-package com.ptut.kspenumcodelab.ui.theme
+package cz.mendelu.pef.xvlastni.ksp_example.ui.theme
 
 import android.app.Activity
 import android.os.Build
@@ -38,7 +38,7 @@ private val LightColorScheme = lightColorScheme(
 )
 
 @Composable
-fun KSPEnumCodelabTheme(
+fun Ksp_exampleTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     // Dynamic color is available on Android 12+
     dynamicColor: Boolean = true,
