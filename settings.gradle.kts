@@ -15,3 +15,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "ksp_example"
 include(":app")
+include(":annotationsProcessor")
