@@ -41,7 +41,7 @@ android {
         compose = true
     }
     composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.1"
+        kotlinCompilerExtensionVersion = "1.5.6"
     }
     packaging {
         resources {
@@ -69,6 +69,6 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 
     implementation(kotlin("stdlib-jdk8"))
-    implementation(project(":rapid_prototyping"))
-    ksp(project(":rapid_prototyping"))
+    implementation(project(":prototype"))
+    ksp(project(":prototype"))
 }

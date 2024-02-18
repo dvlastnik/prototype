@@ -15,4 +15,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "Compose Rapid Prototyping"
 include(":app")
-include(":rapid_prototyping")
+include(":prototype")
