@@ -6,20 +6,52 @@ import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessor
 import com.google.devtools.ksp.symbol.KSAnnotated
 import com.google.devtools.ksp.symbol.KSClassDeclaration
+import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.devtools.ksp.validate
 import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.FileSpec
 import com.squareup.kotlinpoet.FunSpec
-import com.squareup.kotlinpoet.Import
 import cz.mendelu.pef.xvlastni.prototype.Constants.Elements
+import cz.mendelu.pef.xvlastni.prototype.annotations.model.AnnotationModel
+import cz.mendelu.pef.xvlastni.prototype.annotations.RapidPrototype
+import cz.mendelu.pef.xvlastni.prototype.annotations.RapidPrototypeFunction
+import cz.mendelu.pef.xvlastni.prototype.annotations.RapidPrototypeViewModel
 
 class RapidPrototypeProcessor(private val codeGenerator: CodeGenerator) : SymbolProcessor {
     override fun process(resolver: Resolver): List<KSAnnotated> {
-        val symbols = resolver
+        val rapidPrototypeSymbol = resolver
             .getSymbolsWithAnnotation(RapidPrototype::class.qualifiedName!!)
             .filterIsInstance<KSClassDeclaration>()
 
-        symbols.forEach { symbol ->
+        val rapidPrototypeViewModel = resolver
+            .getSymbolsWithAnnotation(RapidPrototypeViewModel::class.qualifiedName!!)
+            .filterIsInstance<KSClassDeclaration>()
+
+        val rapidPrototypeFunction = resolver
+            .getSymbolsWithAnnotation(RapidPrototypeFunction::class.qualifiedName!!)
+            .filterIsInstance<KSFunctionDeclaration>()
+
+        val rPVMData = AnnotationModel()
+        rapidPrototypeViewModel.forEach { symbol ->
+            if (!symbol.validate()) return@forEach
+
+            rPVMData.packageName = symbol.packageName.asString()
+            rPVMData.name = symbol.simpleName.asString()
+
+            return@forEach
+        }
+
+        val rPFData = AnnotationModel() //TODO zmenit na ClassName
+        rapidPrototypeFunction.forEach { symbol ->
+            if (!symbol.validate()) return@forEach
+
+            rPFData.packageName = symbol.packageName.asString()
+            rPFData.name = symbol.simpleName.asString()
+
+            return@forEach
+        }
+
+        rapidPrototypeSymbol.forEach { symbol ->
             if (!symbol.validate()) return@forEach
 
             // variables of the data class
@@ -69,6 +101,10 @@ class RapidPrototypeProcessor(private val codeGenerator: CodeGenerator) : Symbol
                 funSpecBuilder
                     .addStatement("%T(text = %S + user.%L)", textClass, "$propertyName: ", propertyName)
             }
+
+            funSpecBuilder
+                .addStatement("%T(text = %S + %S)", textClass, "ViewModel:", rPVMData.name)
+                .addStatement("%T(text = %S + %S)", textClass, "Function:", rPFData.name)
 
             // end of the composable function
             funSpecBuilder.endControlFlow()
