@@ -11,6 +11,7 @@ import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.FileSpec
 import com.squareup.kotlinpoet.FunSpec
 import com.squareup.kotlinpoet.Import
+import cz.mendelu.pef.xvlastni.prototype.Constants.Elements
 
 class RapidPrototypeProcessor(private val codeGenerator: CodeGenerator) : SymbolProcessor {
     override fun process(resolver: Resolver): List<KSAnnotated> {
@@ -28,6 +29,28 @@ class RapidPrototypeProcessor(private val codeGenerator: CodeGenerator) : Symbol
             val packageName = symbol.packageName.asString()
             val className = symbol.simpleName.asString()
             val fileName = "${className}Screen"
+
+            // building necessary components
+            generateFile(
+                content = Elements.Dimensions.content,
+                packageName = "$packageName.elements",
+                fileName = Elements.Dimensions.name
+            )
+            generateFile(
+                content = Elements.LoadingScreen.content,
+                packageName = "$packageName.elements",
+                fileName = Elements.LoadingScreen.name
+            )
+            generateFile(
+                content = Elements.PlaceholderScreen.content,
+                packageName = "$packageName.elements",
+                fileName = Elements.PlaceholderScreen.name
+            )
+            generateFile(
+                content = Elements.BaseScreen.content,
+                packageName = "$packageName.elements",
+                fileName = Elements.BaseScreen.name
+            )
 
             // variables for used jetpack compose classes
             val composableClass = ClassName("androidx.compose.runtime", "Composable")
@@ -67,5 +90,31 @@ class RapidPrototypeProcessor(private val codeGenerator: CodeGenerator) : Symbol
         }
 
         return emptyList()
+    }
+
+    private fun generateElements(content: String, packageName: String, fileName: String) {
+        val contentWithImport = buildString {
+            appendLine("import $packageName.elements.${Elements.Dimensions.name}")
+            append(content)
+        }
+
+        generateFile(contentWithImport, packageName, fileName)
+    }
+
+    private fun generateFile(content: String, packageName: String, fileName: String) {
+        val contentWithPackage = buildString {
+            appendLine("package $packageName")
+            appendLine()
+            append(content)
+        }
+        val file = codeGenerator.createNewFile(
+            dependencies = Dependencies.ALL_FILES,
+            packageName = packageName,
+            fileName = fileName
+        )
+
+        file.writer().use { writer ->
+            writer.write(contentWithPackage)
+        }
     }
 }
