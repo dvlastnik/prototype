@@ -1,4 +1,6 @@
-package cz.mendelu.pef.xvlastni.prototype.Constants
+package cz.mendelu.pef.xvlastni.prototype.constants
+
+import com.squareup.kotlinpoet.ClassName
 
 object Elements {
     object BaseScreen {
@@ -86,7 +88,7 @@ object Elements {
                     }
                 ) {
                     if (placeholderScreenContent != null) {
-                        PlaceHolderScreen(
+                        PlaceholderScreen(
                             modifier = Modifier.padding(it),
                             content = placeholderScreenContent)
                     }
@@ -163,7 +165,7 @@ object Elements {
             data class PlaceholderScreenContent(val image: Int?, val text: String?)
     
             @Composable
-            fun PlaceHolderScreen(
+            fun PlaceholderScreen(
                 modifier: Modifier,
                 content: PlaceholderScreenContent){
                 Box(modifier = modifier.fillMaxSize()) {

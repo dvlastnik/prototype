@@ -11,7 +11,8 @@ import com.google.devtools.ksp.validate
 import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.FileSpec
 import com.squareup.kotlinpoet.FunSpec
-import cz.mendelu.pef.xvlastni.prototype.Constants.Elements
+import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
+import cz.mendelu.pef.xvlastni.prototype.constants.Elements
 import cz.mendelu.pef.xvlastni.prototype.annotations.model.AnnotationModel
 import cz.mendelu.pef.xvlastni.prototype.annotations.RapidPrototype
 import cz.mendelu.pef.xvlastni.prototype.annotations.RapidPrototypeFunction
@@ -31,22 +32,20 @@ class RapidPrototypeProcessor(private val codeGenerator: CodeGenerator) : Symbol
             .getSymbolsWithAnnotation(RapidPrototypeFunction::class.qualifiedName!!)
             .filterIsInstance<KSFunctionDeclaration>()
 
-        val rPVMData = AnnotationModel()
+        var rPVMData: ClassName? = null
         rapidPrototypeViewModel.forEach { symbol ->
             if (!symbol.validate()) return@forEach
 
-            rPVMData.packageName = symbol.packageName.asString()
-            rPVMData.name = symbol.simpleName.asString()
+            rPVMData = ClassName(symbol.packageName.asString(), symbol.simpleName.asString())
 
             return@forEach
         }
 
-        val rPFData = AnnotationModel() //TODO zmenit na ClassName
+        var rPFData: ClassName? = null //TODO zmenit na ClassName
         rapidPrototypeFunction.forEach { symbol ->
             if (!symbol.validate()) return@forEach
 
-            rPFData.packageName = symbol.packageName.asString()
-            rPFData.name = symbol.simpleName.asString()
+            rPFData = ClassName(symbol.packageName.asString(), symbol.simpleName.asString())
 
             return@forEach
         }
@@ -89,29 +88,99 @@ class RapidPrototypeProcessor(private val codeGenerator: CodeGenerator) : Symbol
             val columnClass = ClassName("androidx.compose.foundation.layout", "Column")
             val textClass = ClassName("androidx.compose.material3", "Text")
             val modifierClass = ClassName("androidx.compose.ui", "Modifier")
+            val hiltViewModelClass = ClassName("androidx.hilt.navigation.compose", "hiltViewModel")
+            val stringResourceClass = ClassName("androidx.compose.ui.res", "stringResource")
+            //TODO: Remove only temporary solution
+            val uiStateClass = ClassName("cz.mendelu.pef.xvlastni.compose_rapid_prototyping.model", "UiState")
+            val defaultErrorsClass = ClassName("cz.mendelu.pef.xvlastni.compose_rapid_prototyping.architecture", "DefaultErrors")
+            // TODO: ------
+
+            // variables
+            val viewModelVar = "viewModel"
+            val uiStateVar = "uiState"
+
+            val mutableStateClass = ClassName("androidx.compose.runtime", "MutableState")
+            val rememberSaveableClass = ClassName("androidx.compose.runtime.saveable", "rememberSaveable")
+            val mutableStateOfClass = ClassName("androidx.compose.runtime", "mutableStateOf")
+            val launchedEffectClass = ClassName("androidx.compose.runtime", "LaunchedEffect")
 
             // making composable function
-            val funSpecBuilder = FunSpec.builder(fileName)
+            val screenContentBuilder = FunSpec.builder(fileName)
                 .addAnnotation(composableClass)
-                .addParameter("user", ClassName(packageName, className))
-                .beginControlFlow("%T(modifier = %T.fillMaxSize())", columnClass, modifierClass)
+                .addParameter(uiStateVar, uiStateClass.parameterizedBy(ClassName(packageName, className), defaultErrorsClass))
+                .addStatement("")
+                .beginControlFlow("if ($uiStateVar.data == null) ")
+                .addStatement("%T(text = %S)", textClass, "LOL nothing in there")
+                .endControlFlow()
+                .beginControlFlow("else ")
 
             properties.forEach { property ->
                 val propertyName = property.simpleName.asString()
-                funSpecBuilder
-                    .addStatement("%T(text = %S + user.%L)", textClass, "$propertyName: ", propertyName)
+                screenContentBuilder
+                    .addStatement("%T(text = $uiStateVar.data!!.%L.toString())", textClass, propertyName)
             }
 
-            funSpecBuilder
-                .addStatement("%T(text = %S + %S)", textClass, "ViewModel:", rPVMData.name)
-                .addStatement("%T(text = %S + %S)", textClass, "Function:", rPFData.name)
+            screenContentBuilder
+                .endControlFlow()
 
-            // end of the composable function
-            funSpecBuilder.endControlFlow()
+            val screenBuilder = FunSpec.builder(fileName)
+                .addAnnotation(composableClass)
+                .addStatement("val $viewModelVar = %T<%T>()", hiltViewModelClass, rPVMData!!)
+                .addStatement("")
+                .beginControlFlow("$viewModelVar.let ")
+                .beginControlFlow("%T(it) ", launchedEffectClass)
+                .addStatement("$viewModelVar.${rPFData!!.simpleName}()")
+                .endControlFlow()
+                .endControlFlow()
+                .addStatement("")
+                .beginControlFlow("val $uiStateVar: %T<%T<$className, %T>> = %T ", //{
+                    mutableStateClass,
+                    uiStateClass,
+                    defaultErrorsClass,
+                    rememberSaveableClass
+                )
+                .addStatement("%T(%T())",
+                    mutableStateOfClass,
+                    uiStateClass
+                )
+                .endControlFlow() //}
+                .addStatement("")
+                .beginControlFlow("$viewModelVar.$uiStateVar.value.let ")
+                .addStatement("$uiStateVar.value = it")
+                .endControlFlow() //}
+                .addStatement("")
+                .addCode("""
+                    ${Elements.BaseScreen.name}(
+                        topBarText = %S,
+                        drawFullScreenContent = false,
+                        showLoading = $uiStateVar.value.loading,
+                        placeholderScreenContent = if ($uiStateVar.value.errors != null) {
+                            ${Elements.PlaceholderScreen.name}Content(null, %T(id = $uiStateVar.value.errors!!.communicationError))
+                        }
+                        else {
+                            null
+                        },
+                        actions = {},
+                        bottomContent = {},
+                        showBottomSheet = %T(false),
+                        bottomSheetContent = {}
+                    )   
+                """.trimIndent(),
+                    className,
+                    stringResourceClass,
+                    mutableStateOfClass
+                )
+                .beginControlFlow("")
+                .endControlFlow()
 
             val fileSpec = FileSpec.builder(packageName, fileName)
                 .addImport("androidx.compose.foundation.layout.fillMaxSize", "")
-                .addFunction(funSpecBuilder.build())
+                .addImport("$packageName.elements", Elements.BaseScreen.name)
+                .addImport("$packageName.elements", Elements.PlaceholderScreen.name)
+                .addImport("$packageName.elements", "${Elements.PlaceholderScreen.name}Content")
+                .addImport("$packageName.elements", Elements.LoadingScreen.name)
+                .addFunction(screenBuilder.build())
+                .addFunction(screenContentBuilder.build())
                 .build()
 
             val file = codeGenerator.createNewFile(
