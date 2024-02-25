@@ -6,10 +6,11 @@ import cz.mendelu.pef.xvlastni.compose_rapid_prototyping.communication.RemoteRep
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
+import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
 @Module
-@InstallIn
+@InstallIn(SingletonComponent::class)
 object RepositoryModule {
 
     @Provides

@@ -105,7 +105,7 @@ class RapidPrototypeProcessor(private val codeGenerator: CodeGenerator) : Symbol
             val launchedEffectClass = ClassName("androidx.compose.runtime", "LaunchedEffect")
 
             // making composable function
-            val screenContentBuilder = FunSpec.builder(fileName)
+            val screenContentBuilder = FunSpec.builder(fileName + "Content")
                 .addAnnotation(composableClass)
                 .addParameter(uiStateVar, uiStateClass.parameterizedBy(ClassName(packageName, className), defaultErrorsClass))
                 .addStatement("")
@@ -171,6 +171,7 @@ class RapidPrototypeProcessor(private val codeGenerator: CodeGenerator) : Symbol
                     mutableStateOfClass
                 )
                 .beginControlFlow("")
+                .addStatement("%T($uiStateVar = $uiStateVar.value)", ClassName(packageName, fileName + "Content"))
                 .endControlFlow()
 
             val fileSpec = FileSpec.builder(packageName, fileName)

@@ -19,7 +19,7 @@ import javax.inject.Inject
 
 @RapidPrototypeViewModel
 @HiltViewModel
-class ViewModel @Inject constructor(
+class MyViewModel @Inject constructor(
     private val repository: IRemoteRepository
 ) : BaseViewModel() {
     val uiState: MutableState<UiState<Activity, DefaultErrors>>

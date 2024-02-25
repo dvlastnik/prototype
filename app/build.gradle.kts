@@ -1,6 +1,8 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    id("dagger.hilt.android.plugin")
+    id("kotlin-kapt")
     id("com.google.devtools.ksp") version "1.9.21-1.0.15"
 }
 
@@ -73,11 +75,15 @@ dependencies {
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
 
     //hilt
-    implementation("com.google.dagger:hilt-android:2.48.1")
-    ksp("com.google.dagger:hilt-android:2.48.1")
+    implementation("com.google.dagger:hilt-android:2.46")
+    kapt("com.google.dagger:hilt-android-compiler:2.46")
     implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
 
     implementation(kotlin("stdlib-jdk8"))
     implementation(project(":prototype"))
     ksp(project(":prototype"))
+}
+
+kapt {
+    correctErrorTypes = true
 }
