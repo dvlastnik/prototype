@@ -82,6 +82,11 @@ class RapidPrototypeProcessor(private val codeGenerator: CodeGenerator) : Symbol
                 packageName = "$packageName.elements",
                 fileName = Elements.BaseScreen.name
             )
+            generateFile(
+                content = Elements.RapidRow.content,
+                packageName = "$packageName.elements",
+                fileName = Elements.RapidRow.name
+            )
 
             // variables for used jetpack compose classes
             val composableClass = ClassName("androidx.compose.runtime", "Composable")
@@ -90,6 +95,7 @@ class RapidPrototypeProcessor(private val codeGenerator: CodeGenerator) : Symbol
             val modifierClass = ClassName("androidx.compose.ui", "Modifier")
             val hiltViewModelClass = ClassName("androidx.hilt.navigation.compose", "hiltViewModel")
             val stringResourceClass = ClassName("androidx.compose.ui.res", "stringResource")
+
             //TODO: Remove only temporary solution
             val uiStateClass = ClassName("cz.mendelu.pef.xvlastni.compose_rapid_prototyping.model", "UiState")
             val defaultErrorsClass = ClassName("cz.mendelu.pef.xvlastni.compose_rapid_prototyping.architecture", "DefaultErrors")
@@ -103,6 +109,11 @@ class RapidPrototypeProcessor(private val codeGenerator: CodeGenerator) : Symbol
             val rememberSaveableClass = ClassName("androidx.compose.runtime.saveable", "rememberSaveable")
             val mutableStateOfClass = ClassName("androidx.compose.runtime", "mutableStateOf")
             val launchedEffectClass = ClassName("androidx.compose.runtime", "LaunchedEffect")
+            val alignmentClass = ClassName("androidx.compose.ui", "Alignment")
+            val arrangementClass = ClassName("androidx.compose.foundation.layout", "Arrangement")
+            val paddingClass = ClassName("androidx.compose.foundation.layout", "padding")
+            val floatingActionButtonClass = ClassName("androidx.compose.material3", "FloatingActionButton")
+            val iconClass = ClassName("androidx.compose.material3", "Icon")
 
             // making composable function
             val screenContentBuilder = FunSpec.builder(fileName + "Content")
@@ -110,17 +121,27 @@ class RapidPrototypeProcessor(private val codeGenerator: CodeGenerator) : Symbol
                 .addParameter(uiStateVar, uiStateClass.parameterizedBy(ClassName(packageName, className), defaultErrorsClass))
                 .addStatement("")
                 .beginControlFlow("if ($uiStateVar.data == null) ")
-                .addStatement("%T(text = %S)", textClass, "LOL nothing in there")
+                .addStatement("%T(text = %S)", textClass, "nothing in there")
                 .endControlFlow()
                 .beginControlFlow("else ")
+                .beginControlFlow("""
+                    %T(
+                        modifier = %T
+                            .fillMaxSize()
+                            .%T(all = basicMargin()),
+                        horizontalAlignment = %T.CenterHorizontally,
+                        verticalArrangement = %T.Center
+                    )
+                """.trimIndent(), columnClass, modifierClass, paddingClass, alignmentClass, arrangementClass)
 
             properties.forEach { property ->
                 val propertyName = property.simpleName.asString()
                 screenContentBuilder
-                    .addStatement("%T(text = $uiStateVar.data!!.%L.toString())", textClass, propertyName)
+                    .addStatement("%T(trailing = %S, leading = $uiStateVar.data!!.%L.toString())", ClassName("$packageName.elements", "RapidRow"), propertyName, propertyName)
             }
 
             screenContentBuilder
+                .endControlFlow()
                 .endControlFlow()
 
             val screenBuilder = FunSpec.builder(fileName)
@@ -160,6 +181,11 @@ class RapidPrototypeProcessor(private val codeGenerator: CodeGenerator) : Symbol
                         else {
                             null
                         },
+                        floatingActionButton = {
+                            %T(onClick = { $viewModelVar.${rPFData!!.simpleName}() }) {
+                                %T(imageVector = Icons.Default.Refresh, contentDescription = null)
+                            }
+                        },
                         actions = {},
                         bottomContent = {},
                         showBottomSheet = %T(false),
@@ -168,6 +194,8 @@ class RapidPrototypeProcessor(private val codeGenerator: CodeGenerator) : Symbol
                 """.trimIndent(),
                     className,
                     stringResourceClass,
+                    floatingActionButtonClass,
+                    iconClass,
                     mutableStateOfClass
                 )
                 .beginControlFlow("")
@@ -176,10 +204,15 @@ class RapidPrototypeProcessor(private val codeGenerator: CodeGenerator) : Symbol
 
             val fileSpec = FileSpec.builder(packageName, fileName)
                 .addImport("androidx.compose.foundation.layout.fillMaxSize", "")
+                .addImport("$packageName.elements", Elements.RapidRow.name)
                 .addImport("$packageName.elements", Elements.BaseScreen.name)
                 .addImport("$packageName.elements", Elements.PlaceholderScreen.name)
                 .addImport("$packageName.elements", "${Elements.PlaceholderScreen.name}Content")
                 .addImport("$packageName.elements", Elements.LoadingScreen.name)
+                .addImport("$packageName.elements", "basicMargin")
+                .addImport("$packageName.elements", "halfMargin")
+                .addImport("androidx.compose.material.icons.filled", "Refresh")
+                .addImport("androidx.compose.material.icons", "Icons")
                 .addFunction(screenBuilder.build())
                 .addFunction(screenContentBuilder.build())
                 .build()

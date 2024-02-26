@@ -3,6 +3,65 @@ package cz.mendelu.pef.xvlastni.prototype.constants
 import com.squareup.kotlinpoet.ClassName
 
 object Elements {
+    object RapidRow {
+        val name = "RapidRow"
+        val content = """
+            import androidx.compose.foundation.layout.Column
+            import androidx.compose.foundation.layout.Row
+            import androidx.compose.foundation.layout.Spacer
+            import androidx.compose.foundation.layout.fillMaxWidth
+            import androidx.compose.foundation.layout.height
+            import androidx.compose.foundation.layout.padding
+            import androidx.compose.foundation.text.ClickableText
+            import androidx.compose.material3.Text
+            import androidx.compose.runtime.Composable
+            import androidx.compose.ui.Alignment
+            import androidx.compose.ui.Modifier
+            import androidx.compose.ui.platform.LocalUriHandler
+            import androidx.compose.ui.platform.testTag
+            import androidx.compose.ui.res.stringResource
+            import androidx.compose.ui.text.SpanStyle
+            import androidx.compose.ui.text.TextStyle
+            import androidx.compose.ui.text.buildAnnotatedString
+            import androidx.compose.ui.text.font.FontWeight
+            import androidx.compose.ui.text.style.TextDecoration
+            import androidx.compose.ui.unit.dp
+            
+            @Composable
+            fun RapidRow(
+                trailing: String,
+                leading: String
+            ) {
+                Row(
+                    modifier = Modifier
+                        .padding(4.dp)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth(0.5f)
+                    ) {
+                        Text(
+                            text = trailing, 
+                            style = TextStyle(
+                                fontWeight = FontWeight.Bold
+                            )
+                        )
+                    }
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.End
+                    ) {
+                         Text(
+                            text = leading,
+                            style = TextStyle(
+                                fontWeight = FontWeight.Normal
+                            )
+                        )
+                    }
+                }
+            }
+        """.trimIndent()
+    }
     object BaseScreen {
         val name = "BaseScreen"
         val content = """
