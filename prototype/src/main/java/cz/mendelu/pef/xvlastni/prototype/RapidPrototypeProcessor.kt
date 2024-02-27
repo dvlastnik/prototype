@@ -13,7 +13,6 @@ import com.squareup.kotlinpoet.FileSpec
 import com.squareup.kotlinpoet.FunSpec
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import cz.mendelu.pef.xvlastni.prototype.constants.Elements
-import cz.mendelu.pef.xvlastni.prototype.annotations.model.AnnotationModel
 import cz.mendelu.pef.xvlastni.prototype.annotations.RapidPrototype
 import cz.mendelu.pef.xvlastni.prototype.annotations.RapidPrototypeFunction
 import cz.mendelu.pef.xvlastni.prototype.annotations.RapidPrototypeViewModel
