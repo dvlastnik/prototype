@@ -13,8 +13,8 @@ interface AppDao {
     fun getUsers(): Flow<List<User>>
 
     @Insert
-    fun insertUser(user: User): Long
+    suspend fun insertUser(user: User): Long
 
     @Delete
-    fun deleteUser(user: User)
+    suspend fun deleteUser(user: User)
 }

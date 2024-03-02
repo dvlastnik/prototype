@@ -80,13 +80,12 @@ dependencies {
     implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
 
     //room
-    implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.5.1")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.5.1")
-    implementation("androidx.room:room-ktx:2.5.0")
+    implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.6.1")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.6.1")
+    implementation("androidx.room:room-ktx:2.6.0")
     implementation("androidx.legacy:legacy-support-v4:1.0.0")
-    //kapt
-    kapt("androidx.room:room-compiler:2.5.0")
-    implementation("androidx.room:room-runtime:2.5.0")
+    kapt("androidx.room:room-compiler:2.6.0")
+    implementation("androidx.room:room-runtime:2.6.0")
 
     implementation(kotlin("stdlib-jdk8"))
     implementation(project(":prototype"))

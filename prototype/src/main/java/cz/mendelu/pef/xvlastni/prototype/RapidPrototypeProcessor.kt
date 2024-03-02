@@ -2,23 +2,34 @@ package cz.mendelu.pef.xvlastni.prototype
 
 import com.google.devtools.ksp.processing.CodeGenerator
 import com.google.devtools.ksp.processing.Dependencies
+import com.google.devtools.ksp.processing.KSPLogger
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessor
 import com.google.devtools.ksp.symbol.KSAnnotated
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
+import com.google.devtools.ksp.symbol.KSType
 import com.google.devtools.ksp.validate
 import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.FileSpec
 import com.squareup.kotlinpoet.FunSpec
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
+import com.squareup.kotlinpoet.asClassName
 import cz.mendelu.pef.xvlastni.prototype.constants.Elements
 import cz.mendelu.pef.xvlastni.prototype.annotations.RapidPrototype
 import cz.mendelu.pef.xvlastni.prototype.annotations.RapidPrototypeFunction
 import cz.mendelu.pef.xvlastni.prototype.annotations.RapidPrototypeViewModel
+import cz.mendelu.pef.xvlastni.prototype.constants.ClassNames
+import cz.mendelu.pef.xvlastni.prototype.constants.Variables
+import cz.mendelu.pef.xvlastni.prototype.type.RapidPrototypeFunctionType
+import cz.mendelu.pef.xvlastni.prototype.type.RapidPrototypeType
 
-class RapidPrototypeProcessor(private val codeGenerator: CodeGenerator) : SymbolProcessor {
+class RapidPrototypeProcessor(
+    private val codeGenerator: CodeGenerator,
+    private val logger: KSPLogger
+) : SymbolProcessor {
     override fun process(resolver: Resolver): List<KSAnnotated> {
+
         val rapidPrototypeSymbol = resolver
             .getSymbolsWithAnnotation(RapidPrototype::class.qualifiedName!!)
             .filterIsInstance<KSClassDeclaration>()
@@ -40,11 +51,34 @@ class RapidPrototypeProcessor(private val codeGenerator: CodeGenerator) : Symbol
             return@forEach
         }
 
-        var rPFData: ClassName? = null //TODO zmenit na ClassName
+        var rPF_Select: ClassName? = null
+        var rPF_Insert: ClassName? = null
         rapidPrototypeFunction.forEach { symbol ->
             if (!symbol.validate()) return@forEach
 
-            rPFData = ClassName(symbol.packageName.asString(), symbol.simpleName.asString())
+            val annotation = symbol.annotations.firstOrNull {
+                it.shortName.asString() == "RapidPrototypeFunction" &&
+                        it.annotationType.resolve().declaration.qualifiedName?.asString() == RapidPrototypeFunction::class.qualifiedName
+            }
+            annotation?.arguments?.forEach { argument ->
+                if (argument.name?.asString() == "type") {
+                    val typeDeclaration = (argument.value as KSType).declaration
+
+                    val functionTypeName = typeDeclaration.simpleName.asString()
+                    val functionType = RapidPrototypeFunctionType.valueOf(functionTypeName)
+
+                    when (functionType) {
+                        RapidPrototypeFunctionType.INSERT -> {
+                            rPF_Insert = ClassName(symbol.packageName.asString(), symbol.simpleName.asString())
+                        }
+                        RapidPrototypeFunctionType.SELECT -> {
+                            rPF_Select = ClassName(symbol.packageName.asString(), symbol.simpleName.asString())
+                        }
+                        // Handle other cases as necessary
+                        RapidPrototypeFunctionType.DELETE -> TODO()
+                    }
+                }
+            }
 
             return@forEach
         }
@@ -52,6 +86,14 @@ class RapidPrototypeProcessor(private val codeGenerator: CodeGenerator) : Symbol
         rapidPrototypeSymbol.forEach { symbol ->
             if (!symbol.validate()) return@forEach
 
+            // accessing parameters of the annotation class
+            val annotation =
+                symbol.annotations.firstOrNull { it.shortName.asString() == "RapidPrototype" }
+            val isList =
+                annotation?.arguments?.find { it.name?.asString() == "isList" }?.value as? Boolean
+
+            val typeDeclaration = (annotation?.arguments?.find { it.name?.asString() == "type" }?.value as KSType).declaration
+            val type = RapidPrototypeType.valueOf(typeDeclaration.simpleName.asString())
             // variables of the data class
             val properties = symbol.getAllProperties()
 
@@ -86,120 +128,163 @@ class RapidPrototypeProcessor(private val codeGenerator: CodeGenerator) : Symbol
                 packageName = "$packageName.elements",
                 fileName = Elements.RapidRow.name
             )
-
-            // variables for used jetpack compose classes
-            val composableClass = ClassName("androidx.compose.runtime", "Composable")
-            val columnClass = ClassName("androidx.compose.foundation.layout", "Column")
-            val textClass = ClassName("androidx.compose.material3", "Text")
-            val modifierClass = ClassName("androidx.compose.ui", "Modifier")
-            val hiltViewModelClass = ClassName("androidx.hilt.navigation.compose", "hiltViewModel")
-            val stringResourceClass = ClassName("androidx.compose.ui.res", "stringResource")
+            generateFile(
+                content = Elements.RapidListRow.content,
+                packageName = "$packageName.elements",
+                fileName = Elements.RapidListRow.name
+            )
 
             //TODO: Remove only temporary solution
-            val uiStateClass = ClassName("cz.mendelu.pef.xvlastni.compose_rapid_prototyping.model", "UiState")
-            val defaultErrorsClass = ClassName("cz.mendelu.pef.xvlastni.compose_rapid_prototyping.architecture", "DefaultErrors")
+            val uiStateClass =
+                ClassName("cz.mendelu.pef.xvlastni.compose_rapid_prototyping.model", "UiState")
+            val defaultErrorsClass = ClassName(
+                "cz.mendelu.pef.xvlastni.compose_rapid_prototyping.architecture",
+                "DefaultErrors"
+            )
+            val errorClass =
+                ClassName("cz.mendelu.pef.xvlastni.compose_rapid_prototyping.architecture", "Error")
             // TODO: ------
-
-            // variables
-            val viewModelVar = "viewModel"
-            val uiStateVar = "uiState"
-
-            val mutableStateClass = ClassName("androidx.compose.runtime", "MutableState")
-            val rememberSaveableClass = ClassName("androidx.compose.runtime.saveable", "rememberSaveable")
-            val mutableStateOfClass = ClassName("androidx.compose.runtime", "mutableStateOf")
-            val launchedEffectClass = ClassName("androidx.compose.runtime", "LaunchedEffect")
-            val alignmentClass = ClassName("androidx.compose.ui", "Alignment")
-            val arrangementClass = ClassName("androidx.compose.foundation.layout", "Arrangement")
-            val paddingClass = ClassName("androidx.compose.foundation.layout", "padding")
-            val floatingActionButtonClass = ClassName("androidx.compose.material3", "FloatingActionButton")
-            val iconClass = ClassName("androidx.compose.material3", "Icon")
-
-            // making composable function
+            
             val screenContentBuilder = FunSpec.builder(fileName + "Content")
-                .addAnnotation(composableClass)
-                .addParameter(uiStateVar, uiStateClass.parameterizedBy(ClassName(packageName, className), defaultErrorsClass))
-                .addStatement("")
-                .beginControlFlow("if ($uiStateVar.data == null) ")
-                .addStatement("%T(text = %S)", textClass, "nothing in there")
-                .endControlFlow()
-                .beginControlFlow("else ")
-                .beginControlFlow("""
+            val screenBuilder = FunSpec.builder(fileName)
+
+            if (isList == true && type == RapidPrototypeType.DATABASE) {
+
+                // making composable function
+                screenContentBuilder
+                    .addAnnotation(ClassNames.composableClass)
+                    .addParameter(
+                        Variables.uiState,
+                        uiStateClass.parameterizedBy(
+                            List::class.asClassName()
+                                .parameterizedBy(ClassName(packageName, className)), errorClass
+                        )
+                    )
+                    .addParameter(Variables.paddingValues, ClassNames.paddingValuesClass)
+                    .addParameter(
+                        Variables.openBottomSheet,
+                        ClassNames.mutableStateClass.parameterizedBy(Boolean::class.asClassName())
+                    )
+                    .addStatement("")
+                    .beginControlFlow(
+                        """
                     %T(
                         modifier = %T
+                            .%T(${Variables.paddingValues})
                             .fillMaxSize()
-                            .%T(all = basicMargin()),
-                        horizontalAlignment = %T.CenterHorizontally,
-                        verticalArrangement = %T.Center
                     )
-                """.trimIndent(), columnClass, modifierClass, paddingClass, alignmentClass, arrangementClass)
+                """.trimIndent(),
+                        ClassNames.lazyColumnClass,
+                        ClassNames.modifierClass,
+                        ClassNames.paddingClass
+                    )
+                    .beginControlFlow("${Variables.uiState}.data?.let { data ->")
+                    .beginControlFlow("data.forEachIndexed { index, it ->")
+                    .beginControlFlow("item {")
+                    .beginControlFlow("if (index != 0) {")
+                    .addStatement(
+                        """
+                    %T(
+                        modifier = %T
+                            .%T(start = halfMargin(), end = halfMargin())
+                            .%T(1.%T)
+                    )
+                """.trimIndent(),
+                        ClassNames.dividerClass,
+                        ClassNames.modifierClass,
+                        ClassNames.paddingClass,
+                        ClassNames.heightClass,
+                        ClassNames.dpClass
+                    )
 
-            properties.forEach { property ->
-                val propertyName = property.simpleName.asString()
+                var titleIndex = 0
+                properties.forEachIndexed { index, property ->
+                    logger.warn("property: $property, $index")
+                    if (property.simpleName.asString() == "id") {
+                        titleIndex = index
+                    }
+                }
+                val firstPropertyName = properties.elementAt(titleIndex).simpleName.asString()
+                val secondPropertyName = properties.elementAt(titleIndex + 1).simpleName.asString()
+
                 screenContentBuilder
-                    .addStatement("%T(trailing = %S, leading = $uiStateVar.data!!.%L.toString())", ClassName("$packageName.elements", "RapidRow"), propertyName, propertyName)
-            }
+                    .addStatement(
+                        """
+                    RapidListRow(
+                        title = it.$firstPropertyName.toString(),
+                        subtitle = it.$secondPropertyName.toString()
+                    )
+                """.trimIndent()
+                    )
+                    .endControlFlow()
+                    .endControlFlow()
+                    .endControlFlow()
+                    .endControlFlow()
+                    .endControlFlow()
 
-            screenContentBuilder
-                .endControlFlow()
-                .endControlFlow()
-
-            val screenBuilder = FunSpec.builder(fileName)
-                .addAnnotation(composableClass)
-                .addStatement("val $viewModelVar = %T<%T>()", hiltViewModelClass, rPVMData!!)
-                .addStatement("")
-                .beginControlFlow("$viewModelVar.let ")
-                .beginControlFlow("%T(it) ", launchedEffectClass)
-                .addStatement("$viewModelVar.${rPFData!!.simpleName}()")
-                .endControlFlow()
-                .endControlFlow()
-                .addStatement("")
-                .beginControlFlow("val $uiStateVar: %T<%T<$className, %T>> = %T ", //{
-                    mutableStateClass,
-                    uiStateClass,
-                    defaultErrorsClass,
-                    rememberSaveableClass
-                )
-                .addStatement("%T(%T())",
-                    mutableStateOfClass,
-                    uiStateClass
-                )
-                .endControlFlow() //}
-                .addStatement("")
-                .beginControlFlow("$viewModelVar.$uiStateVar.value.let ")
-                .addStatement("$uiStateVar.value = it")
-                .endControlFlow() //}
-                .addStatement("")
-                .addCode("""
+                screenBuilder
+                    .addAnnotation(ClassNames.composableClass)
+                    .addStatement(
+                        "val ${Variables.viewModel} = %T<%T>()",
+                        ClassNames.hiltViewModelClass,
+                        rPVMData!!
+                    )
+                    .addStatement("")
+                    .beginControlFlow(
+                        "val ${Variables.uiState}: %T<%T<List<$className>, %T>> = %T ", //{
+                        ClassNames.mutableStateClass,
+                        uiStateClass,
+                        errorClass,
+                        ClassNames.rememberSaveableClass
+                    )
+                    .addStatement(
+                        "%T(%T())",
+                        ClassNames.mutableStateOfClass,
+                        uiStateClass
+                    )
+                    .endControlFlow() //}
+                    .addStatement("")
+                    .beginControlFlow("%T(Unit)", ClassNames.launchedEffectClass)
+                    .addStatement("${Variables.viewModel}.${rPF_Select!!.simpleName}()")
+                    .endControlFlow()
+                    .addStatement("")
+                    .beginControlFlow("${Variables.viewModel}.${Variables.uiState}.value.let ")
+                    .addStatement("${Variables.uiState}.value = it")
+                    .endControlFlow() //}
+                    .addStatement("")
+                    .addStatement(
+                        "val ${Variables.openBottomSheet} = %T { %T(false) }",
+                        ClassNames.rememberSaveableClass,
+                        ClassNames.mutableStateOfClass
+                    )
+                    .addCode(
+                        """
                     ${Elements.BaseScreen.name}(
                         topBarText = %S,
-                        drawFullScreenContent = false,
-                        showLoading = $uiStateVar.value.loading,
-                        placeholderScreenContent = if ($uiStateVar.value.errors != null) {
-                            ${Elements.PlaceholderScreen.name}Content(null, %T(id = $uiStateVar.value.errors!!.communicationError))
-                        }
-                        else {
-                            null
-                        },
+                        drawFullScreenContent = true,
+                        showLoading = ${Variables.uiState}.value.loading,
                         floatingActionButton = {
-                            %T(onClick = { $viewModelVar.${rPFData!!.simpleName}() }) {
-                                %T(imageVector = Icons.Default.Refresh, contentDescription = null)
+                            %T(onClick = { ${Variables.viewModel}.${rPF_Insert!!.simpleName}() }) {
+                                %T(imageVector = Icons.Default.Add, contentDescription = null)
                             }
                         },
                         actions = {},
                         bottomContent = {},
-                        showBottomSheet = %T(false),
+                        showBottomSheet = ${Variables.openBottomSheet},
                         bottomSheetContent = {}
                     )   
                 """.trimIndent(),
-                    className,
-                    stringResourceClass,
-                    floatingActionButtonClass,
-                    iconClass,
-                    mutableStateOfClass
-                )
-                .beginControlFlow("")
-                .addStatement("%T($uiStateVar = $uiStateVar.value)", ClassName(packageName, fileName + "Content"))
-                .endControlFlow()
+                        className,
+                        ClassNames.floatingActionButtonClass,
+                        ClassNames.iconClass,
+                    )
+                    .beginControlFlow("")
+                    .addStatement(
+                        "%T(${Variables.uiState} = ${Variables.uiState}.value, ${Variables.paddingValues} = it, ${Variables.openBottomSheet} = ${Variables.openBottomSheet})",
+                        ClassName(packageName, fileName + "Content")
+                    )
+                    .endControlFlow()
+            }
 
             val fileSpec = FileSpec.builder(packageName, fileName)
                 .addImport("androidx.compose.foundation.layout.fillMaxSize", "")
@@ -208,9 +293,10 @@ class RapidPrototypeProcessor(private val codeGenerator: CodeGenerator) : Symbol
                 .addImport("$packageName.elements", Elements.PlaceholderScreen.name)
                 .addImport("$packageName.elements", "${Elements.PlaceholderScreen.name}Content")
                 .addImport("$packageName.elements", Elements.LoadingScreen.name)
+                .addImport("$packageName.elements", Elements.RapidListRow.name)
                 .addImport("$packageName.elements", "basicMargin")
                 .addImport("$packageName.elements", "halfMargin")
-                .addImport("androidx.compose.material.icons.filled", "Refresh")
+                .addImport("androidx.compose.material.icons.filled", "Add")
                 .addImport("androidx.compose.material.icons", "Icons")
                 .addFunction(screenBuilder.build())
                 .addFunction(screenContentBuilder.build())
@@ -225,6 +311,7 @@ class RapidPrototypeProcessor(private val codeGenerator: CodeGenerator) : Symbol
             file.writer().use { writer ->
                 fileSpec.writeTo(writer)
             }
+
         }
 
         return emptyList()

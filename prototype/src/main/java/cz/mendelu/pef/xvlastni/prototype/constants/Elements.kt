@@ -3,6 +3,77 @@ package cz.mendelu.pef.xvlastni.prototype.constants
 import com.squareup.kotlinpoet.ClassName
 
 object Elements {
+    object RapidListRow {
+        val name = "RapidListRow"
+        val content = """
+            import androidx.compose.foundation.clickable
+            import androidx.compose.foundation.layout.Arrangement
+            import androidx.compose.foundation.layout.Column
+            import androidx.compose.foundation.layout.Row
+            import androidx.compose.foundation.layout.fillMaxWidth
+            import androidx.compose.foundation.layout.padding
+            import androidx.compose.material.icons.Icons
+            import androidx.compose.material.icons.filled.ArrowForward
+            import androidx.compose.material3.Icon
+            import androidx.compose.material3.Text
+            import androidx.compose.runtime.Composable
+            import androidx.compose.runtime.MutableState
+            import androidx.compose.ui.Alignment
+            import androidx.compose.ui.Modifier
+            import androidx.compose.ui.res.painterResource
+            import androidx.compose.ui.text.style.TextOverflow
+            import androidx.compose.ui.unit.dp
+            import androidx.compose.ui.text.TextStyle
+            import androidx.compose.ui.text.font.FontWeight
+            import androidx.compose.ui.unit.sp
+            
+            @Composable
+            fun RapidListRow(
+                title: String,
+                subtitle: String
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 16.dp, top = 8.dp, end = 8.dp, bottom = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(end = 8.dp)
+                    ) {
+                        Text(
+                            text = title, 
+                            maxLines = 1, 
+                            overflow = TextOverflow.Ellipsis, 
+                            style = TextStyle(
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 16.sp
+                            )
+                        )
+                        
+                        Text(
+                            text = subtitle, 
+                            maxLines = 1, 
+                            overflow = TextOverflow.Ellipsis, 
+                            style = TextStyle(
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 16.sp
+                            )
+                        )
+                    }
+                    
+                    Icon(
+                        imageVector = Icons.Default.ArrowForward,
+                        contentDescription = null,
+                        modifier = Modifier.padding(end = 8.dp)
+                    )
+                }
+            }
+        """.trimIndent()
+    }
     object RapidRow {
         val name = "RapidRow"
         val content = """

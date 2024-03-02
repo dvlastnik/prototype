@@ -6,6 +6,6 @@ import com.google.devtools.ksp.processing.SymbolProcessorProvider
 
 class RapidPrototypeProcessorProvider : SymbolProcessorProvider {
     override fun create(environment: SymbolProcessorEnvironment): SymbolProcessor {
-        return RapidPrototypeProcessor(environment.codeGenerator)
+        return RapidPrototypeProcessor(environment.codeGenerator, environment.logger)
     }
 }
