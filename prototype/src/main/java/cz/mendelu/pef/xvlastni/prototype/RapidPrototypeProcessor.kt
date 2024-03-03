@@ -13,16 +13,20 @@ import com.google.devtools.ksp.validate
 import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.FileSpec
 import com.squareup.kotlinpoet.FunSpec
+import com.squareup.kotlinpoet.KModifier
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
+import com.squareup.kotlinpoet.PropertySpec
+import com.squareup.kotlinpoet.TypeSpec
 import com.squareup.kotlinpoet.asClassName
 import cz.mendelu.pef.xvlastni.prototype.constants.Elements
 import cz.mendelu.pef.xvlastni.prototype.annotations.RapidPrototype
 import cz.mendelu.pef.xvlastni.prototype.annotations.RapidPrototypeFunction
-import cz.mendelu.pef.xvlastni.prototype.annotations.RapidPrototypeViewModel
+import cz.mendelu.pef.xvlastni.prototype.annotations.RapidPrototypeRepository
 import cz.mendelu.pef.xvlastni.prototype.constants.ClassNames
 import cz.mendelu.pef.xvlastni.prototype.constants.Variables
 import cz.mendelu.pef.xvlastni.prototype.type.RapidPrototypeFunctionType
 import cz.mendelu.pef.xvlastni.prototype.type.RapidPrototypeType
+import javax.swing.text.Element
 
 class RapidPrototypeProcessor(
     private val codeGenerator: CodeGenerator,
@@ -34,19 +38,19 @@ class RapidPrototypeProcessor(
             .getSymbolsWithAnnotation(RapidPrototype::class.qualifiedName!!)
             .filterIsInstance<KSClassDeclaration>()
 
-        val rapidPrototypeViewModel = resolver
-            .getSymbolsWithAnnotation(RapidPrototypeViewModel::class.qualifiedName!!)
+        val rapidPrototypeRepository = resolver
+            .getSymbolsWithAnnotation(RapidPrototypeRepository::class.qualifiedName!!)
             .filterIsInstance<KSClassDeclaration>()
 
         val rapidPrototypeFunction = resolver
             .getSymbolsWithAnnotation(RapidPrototypeFunction::class.qualifiedName!!)
             .filterIsInstance<KSFunctionDeclaration>()
 
-        var rPVMData: ClassName? = null
-        rapidPrototypeViewModel.forEach { symbol ->
+        var repository: ClassName? = null
+        rapidPrototypeRepository.forEach { symbol ->
             if (!symbol.validate()) return@forEach
 
-            rPVMData = ClassName(symbol.packageName.asString(), symbol.simpleName.asString())
+            repository = ClassName(symbol.packageName.asString(), symbol.simpleName.asString())
 
             return@forEach
         }
@@ -105,60 +109,141 @@ class RapidPrototypeProcessor(
             // building necessary components
             generateFile(
                 content = Elements.Dimensions.content,
-                packageName = "$packageName.elements",
+                packageName = "$packageName${Elements.Dimensions.packageName}",
                 fileName = Elements.Dimensions.name
             )
             generateFile(
                 content = Elements.LoadingScreen.content,
-                packageName = "$packageName.elements",
+                packageName = "$packageName${Elements.LoadingScreen.packageName}",
                 fileName = Elements.LoadingScreen.name
             )
             generateFile(
                 content = Elements.PlaceholderScreen.content,
-                packageName = "$packageName.elements",
+                packageName = "$packageName${Elements.PlaceholderScreen.packageName}",
                 fileName = Elements.PlaceholderScreen.name
             )
             generateFile(
                 content = Elements.BaseScreen.content,
-                packageName = "$packageName.elements",
+                packageName = "$packageName${Elements.BaseScreen.packageName}",
                 fileName = Elements.BaseScreen.name
             )
             generateFile(
                 content = Elements.RapidRow.content,
-                packageName = "$packageName.elements",
+                packageName = "$packageName${Elements.RapidRow.packageName}",
                 fileName = Elements.RapidRow.name
             )
             generateFile(
                 content = Elements.RapidListRow.content,
-                packageName = "$packageName.elements",
+                packageName = "$packageName${Elements.RapidListRow.packageName}",
                 fileName = Elements.RapidListRow.name
             )
-
-            //TODO: Remove only temporary solution
-            val uiStateClass =
-                ClassName("cz.mendelu.pef.xvlastni.compose_rapid_prototyping.model", "UiState")
-            val defaultErrorsClass = ClassName(
-                "cz.mendelu.pef.xvlastni.compose_rapid_prototyping.architecture",
-                "DefaultErrors"
+            generateFile(
+                content = Elements.BaseViewModel.content,
+                packageName = "$packageName${Elements.BaseViewModel.packageName}",
+                fileName = Elements.BaseViewModel.name
             )
-            val errorClass =
-                ClassName("cz.mendelu.pef.xvlastni.compose_rapid_prototyping.architecture", "Error")
-            // TODO: ------
-            
+            generateFile(
+                content = Elements.Error.content,
+                packageName = "$packageName${Elements.Error.packageName}",
+                fileName = Elements.Error.name
+            )
+            generateFile(
+                content = Elements.UiState.content,
+                packageName = "$packageName${Elements.UiState.packageName}",
+                fileName = Elements.UiState.name
+            )
+
+            val uiStateClass = ClassName(packageName + Elements.UiState.packageName, Elements.UiState.name)
+            val errorClass = ClassName(packageName + Elements.Error.packageName, Elements.Error.name)
+            val modelClass = ClassName(packageName, className)
+
+            val viewModelBuilder = TypeSpec.classBuilder(className + "ViewModel")
             val screenContentBuilder = FunSpec.builder(fileName + "Content")
             val screenBuilder = FunSpec.builder(fileName)
 
             if (isList == true && type == RapidPrototypeType.DATABASE) {
+                // data class
+                generateDataClass(packageName, className)
+
+                // viewModel
+                // UISTATE
+                val uiStateTypeName = uiStateClass
+                    .parameterizedBy(
+                        List::class.asClassName()
+                            .parameterizedBy(modelClass), errorClass
+                    )
+
+                val mutableStateTypeName = ClassNames.mutableStateClass
+                    .parameterizedBy(uiStateTypeName)
+
+                val uiStateProperty = PropertySpec.builder(Variables.uiState, mutableStateTypeName)
+                    .initializer("%T(UiState())", ClassNames.mutableStateOfClass)
+                    .build()
+                //UISTATE
+
+                //SELECT
+                val selectFun = FunSpec.builder(rPF_Select!!.simpleName)
+                    .addModifiers(KModifier.OPEN)
+                    .addCode("""
+                        %T {
+                            ${Variables.repository}.${rPF_Select!!.simpleName}()
+                                .%T {
+                                    ${Variables.uiState}.value = UiState(loading = true, data = null, errors = null)
+                                }
+                                .%T {
+                                    ${Variables.uiState}.value = UiState(loading = false, data = null, errors = Error(0, it.localizedMessage))
+                                }
+                                .collect {
+                                    ${Variables.uiState}.value = UiState(loading = false, data = it, errors = null)
+                                }
+                        }
+                    """.trimIndent(),
+                        ClassNames.launchClass,
+                        ClassNames.flowOnStartClass,
+                        ClassNames.flowCatchClass
+                        )
+                    .build()
+                //SELECT
+
+                //INSERT
+                val insertFun = FunSpec.builder(rPF_Insert!!.simpleName)
+                    .addModifiers(KModifier.OPEN)
+                    .addCode("""
+                        launch {
+                            val user = User("Divad", "divadek@email.cz", age = 23)
+            
+                            val id = ${Variables.repository}.${rPF_Insert!!.simpleName}(user)
+            
+                            if (id > 0) {
+                                Log.d("Rapid Prototype", "Saved")
+                            } else {
+                                Log.d("Rapid Prototype", "Not saved")
+                            }
+                        }
+                    """.trimIndent())
+                    .build()
+                //INSERT
+
+                viewModelBuilder
+                    .addAnnotation(ClassNames.daggerHiltViewModelClass)
+                    .primaryConstructor(FunSpec.constructorBuilder()
+                        .addAnnotation(ClassNames.injectClass)
+                        .addParameter(Variables.repository, repository!!)
+                        .build())
+                    .superclass(ClassName(packageName + Elements.BaseViewModel.packageName, Elements.BaseViewModel.name))
+                    .addProperty(PropertySpec.builder(Variables.repository, repository!!, KModifier.PRIVATE).initializer(Variables.repository).build())
+                    .addProperty(uiStateProperty)
+                    .addFunction(selectFun)
+                    .addFunction(insertFun)
+                    .build()
+
 
                 // making composable function
                 screenContentBuilder
                     .addAnnotation(ClassNames.composableClass)
                     .addParameter(
                         Variables.uiState,
-                        uiStateClass.parameterizedBy(
-                            List::class.asClassName()
-                                .parameterizedBy(ClassName(packageName, className)), errorClass
-                        )
+                        uiStateTypeName
                     )
                     .addParameter(Variables.paddingValues, ClassNames.paddingValuesClass)
                     .addParameter(
@@ -173,7 +258,7 @@ class RapidPrototypeProcessor(
                             .%T(${Variables.paddingValues})
                             .fillMaxSize()
                     )
-                """.trimIndent(),
+                    """.trimIndent(),
                         ClassNames.lazyColumnClass,
                         ClassNames.modifierClass,
                         ClassNames.paddingClass
@@ -225,9 +310,8 @@ class RapidPrototypeProcessor(
                 screenBuilder
                     .addAnnotation(ClassNames.composableClass)
                     .addStatement(
-                        "val ${Variables.viewModel} = %T<%T>()",
-                        ClassNames.hiltViewModelClass,
-                        rPVMData!!
+                        "val ${Variables.viewModel} = %T<${className}ViewModel>()",
+                        ClassNames.hiltViewModelClass
                     )
                     .addStatement("")
                     .beginControlFlow(
@@ -302,21 +386,34 @@ class RapidPrototypeProcessor(
                 .addFunction(screenContentBuilder.build())
                 .build()
 
-            val file = codeGenerator.createNewFile(
-                dependencies = Dependencies(true, symbol.containingFile!!),
-                packageName = packageName,
-                fileName = fileName
-            )
+            generateFileWithFileSpec(packageName, fileName, fileSpec)
 
-            file.writer().use { writer ->
-                fileSpec.writeTo(writer)
-            }
+            val viewModelFileSpec = FileSpec.builder(packageName, "${className}ViewModel")
+                .addImport("android.util", "Log")
+                .addType(viewModelBuilder.build())
+                .build()
 
+            generateFileWithFileSpec(packageName, "${className}ViewModel", viewModelFileSpec)
         }
 
         return emptyList()
     }
-
+    private fun generateDataClass(packageName: String, className: String) {
+        val dataClass = ClassName(packageName, "${className}Data")
+        val dataClassString = """
+                import $packageName.$className
+                
+                data class ${dataClass.simpleName}(
+                    val list: List<$className>,
+                    val detail: $className? = null
+                )
+            """.trimIndent()
+        generateFile(
+            content = dataClassString,
+            packageName = dataClass.packageName,
+            fileName = dataClass.simpleName
+        )
+    }
     private fun generateElements(content: String, packageName: String, fileName: String) {
         val contentWithImport = buildString {
             appendLine("import $packageName.elements.${Elements.Dimensions.name}")
@@ -324,6 +421,18 @@ class RapidPrototypeProcessor(
         }
 
         generateFile(contentWithImport, packageName, fileName)
+    }
+
+    private fun generateFileWithFileSpec(packageName: String, fileName: String, fileSpec: FileSpec) {
+        val file = codeGenerator.createNewFile(
+            dependencies = Dependencies.ALL_FILES,
+            packageName = packageName,
+            fileName = fileName
+        )
+
+        file.writer().use { writer ->
+            fileSpec.writeTo(writer)
+        }
     }
 
     private fun generateFile(content: String, packageName: String, fileName: String) {

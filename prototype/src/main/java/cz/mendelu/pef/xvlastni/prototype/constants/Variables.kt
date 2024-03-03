@@ -5,4 +5,5 @@ object Variables {
     val uiState = "uiState"
     val paddingValues = "paddingValues"
     val openBottomSheet = "openBottomSheet"
+    val repository = "repository"
 }

@@ -3,8 +3,49 @@ package cz.mendelu.pef.xvlastni.prototype.constants
 import com.squareup.kotlinpoet.ClassName
 
 object Elements {
+    object UiState {
+        val name = "UiState"
+        val packageName = ".model"
+        val content = """
+            import java.io.Serializable
+
+            open class UiState<T, E>
+                (
+                var loading: Boolean = true,
+                var data: T? = null,
+                var errors: E? = null) : Serializable {
+            }
+        """.trimIndent()
+    }
+    object Error {
+        val name = "Error"
+        val packageName = ".architecture"
+        val content = """
+            data class Error(
+                val code: Int,
+                val message: String?
+            )
+        """.trimIndent()
+    }
+    object BaseViewModel {
+        val name = "BaseViewModel"
+        val packageName = ".architecture"
+        val content = """
+            import androidx.lifecycle.ViewModel
+            import kotlinx.coroutines.CoroutineScope
+            import kotlinx.coroutines.Dispatchers
+            import kotlinx.coroutines.Job
+            import kotlin.coroutines.CoroutineContext
+
+            abstract class BaseViewModel : ViewModel(), CoroutineScope {
+                private val job = Job()
+                override val coroutineContext: CoroutineContext = Dispatchers.Main + job
+            }
+        """.trimIndent()
+    }
     object RapidListRow {
         val name = "RapidListRow"
+        val packageName = ".elements"
         val content = """
             import androidx.compose.foundation.clickable
             import androidx.compose.foundation.layout.Arrangement
@@ -76,6 +117,7 @@ object Elements {
     }
     object RapidRow {
         val name = "RapidRow"
+        val packageName = ".elements"
         val content = """
             import androidx.compose.foundation.layout.Column
             import androidx.compose.foundation.layout.Row
@@ -135,6 +177,7 @@ object Elements {
     }
     object BaseScreen {
         val name = "BaseScreen"
+        val packageName = ".elements"
         val content = """
             import android.annotation.SuppressLint
             import androidx.compose.foundation.layout.*
@@ -278,6 +321,7 @@ object Elements {
 
     object PlaceholderScreen {
         val name = "PlaceholderScreen"
+        val packageName = ".elements"
         val content = """
             import androidx.compose.foundation.Image
             import androidx.compose.foundation.layout.*
@@ -330,6 +374,7 @@ object Elements {
 
     object LoadingScreen {
         val name = "LoadingScreen"
+        val packageName = ".elements"
         val content = """
             import androidx.compose.foundation.background
             import androidx.compose.foundation.layout.Arrangement
@@ -364,6 +409,7 @@ object Elements {
 
     object Dimensions {
         val name = "Dimensions"
+        val packageName = ".elements"
         val content = """
             import androidx.compose.runtime.Composable
             import androidx.compose.ui.unit.Dp

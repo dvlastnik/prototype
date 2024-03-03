@@ -23,4 +23,9 @@ object ClassNames {
     val dividerClass = ClassName("androidx.compose.material3", "Divider")
     val heightClass = ClassName("androidx.compose.foundation.layout", "height")
     val dpClass = ClassName("androidx.compose.ui.unit", "dp")
+    val daggerHiltViewModelClass = ClassName("dagger.hilt.android.lifecycle", "HiltViewModel")
+    val flowCatchClass = ClassName("kotlinx.coroutines.flow", "catch")
+    val flowOnStartClass = ClassName("kotlinx.coroutines.flow", "onStart")
+    val launchClass = ClassName("kotlinx.coroutines", "launch")
+    val injectClass = ClassName("javax.inject", "Inject")
 }
