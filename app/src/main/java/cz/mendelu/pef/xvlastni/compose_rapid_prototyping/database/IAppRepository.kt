@@ -14,5 +14,6 @@ interface IAppRepository {
     @RapidPrototypeFunction(RapidPrototypeFunctionType.INSERT)
     suspend fun insertUser(user: User): Long
 
+    @RapidPrototypeFunction(RapidPrototypeFunctionType.DELETE)
     suspend fun deleteUser(user: User)
 }

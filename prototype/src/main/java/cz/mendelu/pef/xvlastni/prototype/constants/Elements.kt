@@ -3,6 +3,34 @@ package cz.mendelu.pef.xvlastni.prototype.constants
 import com.squareup.kotlinpoet.ClassName
 
 object Elements {
+    object RandomList {
+        val name = "randomList"
+        val content = """
+            return if (typeName.contains("String")) {
+                "listOf(${RandomString.name}(), ${RandomString.name}(), ${RandomString.name}())"
+            }
+            else if (typeName.contains("Int") || typeName.contains("Long")) {
+                "listOf((0..100).random(), (0..100).random(), (0..100).random())"
+            }
+            else if (typeName.contains("Float") || typeName.contains("Double")) {
+                "listOf(Random.nextFloat(), Random.nextFloat(), Random.nextFloat())"
+            }
+            else {
+                "listOf()"
+            }
+        """.trimIndent()
+    }
+    object RandomString {
+        val name = "randomString"
+        val content = """
+                val chars = ('A'..'Z') + ('a'..'z') + ('0'..'9')
+                return (1..6)
+                    .map {
+                        chars.random()
+                    }
+                    .joinToString("")
+        """.trimIndent()
+    }
     object UiState {
         val name = "UiState"
         val packageName = ".model"
@@ -71,10 +99,11 @@ object Elements {
             @Composable
             fun RapidListRow(
                 title: String,
-                subtitle: String
+                subtitle: String,
+                modifier: Modifier = Modifier
             ) {
                 Row(
-                    modifier = Modifier
+                    modifier = modifier
                         .fillMaxWidth()
                         .padding(start = 16.dp, top = 8.dp, end = 8.dp, bottom = 8.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
