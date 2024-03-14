@@ -208,7 +208,6 @@ object Elements {
         val name = "BaseScreen"
         val packageName = ".elements"
         val content = """
-            import android.annotation.SuppressLint
             import androidx.compose.foundation.layout.*
             import androidx.compose.foundation.lazy.LazyColumn
             import androidx.compose.material.icons.Icons
@@ -224,7 +223,6 @@ object Elements {
             import androidx.compose.ui.unit.dp
 
             @OptIn(ExperimentalMaterial3Api::class)
-            @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
             @Composable
             fun BaseScreen(
                 topBarText: String?,

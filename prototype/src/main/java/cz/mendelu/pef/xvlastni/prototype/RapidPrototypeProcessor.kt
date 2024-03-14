@@ -167,294 +167,15 @@ class RapidPrototypeProcessor(
             val screenBuilder = FunSpec.builder(fileName)
 
             if (isList == true && type == RapidPrototypeType.DATABASE) {
-                // data class
-                val dataClass = generateDataClass(packageName, className)
-                // viewModel
-                // UISTATE
-                val uiStateTypeName = uiStateClass
-                    .parameterizedBy(
-                        dataClass, errorClass
-                    )
-
-                val mutableStateTypeName = ClassNames.mutableStateClass
-                    .parameterizedBy(uiStateTypeName)
-
-                val uiStateProperty = PropertySpec.builder(Variables.uiState, mutableStateTypeName)
-                    .initializer("%T(UiState())", ClassNames.mutableStateOfClass)
-                    .build()
-                //UISTATE
-
-                //SELECT
-                val selectFun = FunSpec.builder(rPF_Select!!.simpleName)
-                    .addModifiers(KModifier.OPEN)
-                    .addCode("""
-                        %T {
-                            ${Variables.repository}.${rPF_Select!!.simpleName}()
-                                .%T {
-                                    ${Variables.uiState}.value = UiState(loading = true, data = null, errors = null)
-                                }
-                                .%T {
-                                    ${Variables.uiState}.value = UiState(loading = false, data = null, errors = Error(0, it.localizedMessage))
-                                }
-                                .collect {
-                                    ${Variables.uiState}.value = UiState(loading = false, data = ${dataClass.simpleName}(list = it, detail = null), errors = null)
-                                }
-                        }
-                    """.trimIndent(),
-                        ClassNames.launchClass,
-                        ClassNames.flowOnStartClass,
-                        ClassNames.flowCatchClass
-                        )
-                    .build()
-                //SELECT
-
-                //INSERT
-                val insertFun = FunSpec.builder(rPF_Insert!!.simpleName)
-                    .addModifiers(KModifier.OPEN)
-                    .addCode("""
-                        launch {
-                            val ${className.lowercase()} = init$className()
-            
-                            val id = ${Variables.repository}.${rPF_Insert!!.simpleName}(user)
-            
-                            if (id > 0) {
-                                Log.d("Rapid Prototype", "Saved")
-                            } else {
-                                Log.d("Rapid Prototype", "Not saved")
-                            }
-                        }
-                    """.trimIndent())
-                    .build()
-                //INSERT
-
-                //DELETE
-                val deleteFun = FunSpec.builder(rPF_Delete!!.simpleName)
-                    .addModifiers(KModifier.OPEN)
-                    .addParameter(className.lowercase(), ClassName(packageName, className))
-                    .addCode("""
-                        launch {
-                            ${Variables.repository}.${rPF_Delete!!.simpleName}(${className.lowercase()})
-                        }
-                    """.trimIndent())
-                    .build()
-                //DELETE
-
-                //SET DETAIL
-                val setDetailFun = FunSpec.builder("set${className}Detail")
-                    .addModifiers(KModifier.OPEN)
-                    .addParameter(className.lowercase(), ClassName(packageName, className))
-                    .addCode("""
-                        ${Variables.uiState}.value.data!!.detail = ${className.lowercase()}
-                    """.trimIndent())
-                    .build()
-                //SET DETAIL
-
-                viewModelBuilder
-                    .addAnnotation(ClassNames.daggerHiltViewModelClass)
-                    .primaryConstructor(FunSpec.constructorBuilder()
-                        .addAnnotation(ClassNames.injectClass)
-                        .addParameter(Variables.repository, repository!!)
-                        .build())
-                    .superclass(ClassName(packageName + Elements.BaseViewModel.packageName, Elements.BaseViewModel.name))
-                    .addProperty(PropertySpec.builder(Variables.repository, repository!!, KModifier.PRIVATE).initializer(Variables.repository).build())
-                    .addProperty(uiStateProperty)
-                    .addFunction(selectFun)
-                    .addFunction(insertFun)
-                    .addFunction(deleteFun)
-                    .addFunction(setDetailFun)
-                    .addFunction(generateModelInitFunction(properties, ClassName(packageName, className)))
-                    .addFunction(
-                        FunSpec.builder(Elements.RandomString.name)
-                            .returns(String::class)
-                            .addCode(Elements.RandomString.content)
-                            .build()
-                    )
-                    .addFunction(
-                        FunSpec.builder(Elements.RandomList.name)
-                            .addParameter("typeName", String::class)
-                            .returns(String::class)
-                            .addCode(Elements.RandomList.content)
-                            .build()
-                    )
-                    .build()
-
-
-                // making composable function
-                screenContentBuilder
-                    .addAnnotation(ClassNames.composableClass)
-                    .addParameter(
-                        Variables.uiState,
-                        uiStateTypeName
-                    )
-                    .addParameter(Variables.paddingValues, ClassNames.paddingValuesClass)
-                    .addParameter(
-                        Variables.openBottomSheet,
-                        ClassNames.mutableStateClass.parameterizedBy(Boolean::class.asClassName())
-                    )
-                    .addParameter(Variables.viewModel, ClassName(packageName, "${className}ViewModel"))
-                    .addStatement("")
-                    .beginControlFlow(
-                        """
-                    %T(
-                        modifier = %T
-                            .%T(${Variables.paddingValues})
-                            .fillMaxSize()
-                    )
-                    """.trimIndent(),
-                        ClassNames.lazyColumnClass,
-                        ClassNames.modifierClass,
-                        ClassNames.paddingClass
-                    )
-                    .beginControlFlow("${Variables.uiState}.data?.let { data ->")
-                    .beginControlFlow("data.list.forEachIndexed { index, it ->")
-                    .beginControlFlow("item {")
-                    .beginControlFlow("if (index != 0) {")
-                    .addStatement(
-                        """
-                    %T(
-                        modifier = %T
-                            .%T(start = halfMargin(), end = halfMargin())
-                            .%T(1.%T)
-                    )
-                """.trimIndent(),
-                        ClassNames.dividerClass,
-                        ClassNames.modifierClass,
-                        ClassNames.paddingClass,
-                        ClassNames.heightClass,
-                        ClassNames.dpClass
-                    )
-
-                var titleIndex = 0
-                properties.forEachIndexed { index, property ->
-                    logger.warn("property: $property, $index")
-                    if (property.simpleName.asString() == "id") {
-                        titleIndex = index
-                    }
-                }
-                val firstPropertyName = properties.elementAt(titleIndex).simpleName.asString()
-                val secondPropertyName = properties.elementAt(titleIndex + 1).simpleName.asString()
-
-                val propertiesCode = properties.joinToString(separator = "\n") {
-                    val propertyName = it.simpleName.asString()
-                    """RapidRow(trailing = "$propertyName", leading = it.$propertyName.toString())"""
-                }
-
-                screenContentBuilder
-                    .addStatement(
-                        """
-                    RapidListRow(
-                        title = it.$firstPropertyName.toString(),
-                        subtitle = it.$secondPropertyName.toString(),
-                        modifier = Modifier.%T {
-                            ${Variables.viewModel}.set${className}Detail(it)
-                            ${Variables.openBottomSheet}.value = true
-                        }
-                    )
-                """.trimIndent(),
-                        ClassNames.clickableClass
-                    )
-                    .endControlFlow()
-                    .endControlFlow()
-                    .endControlFlow()
-                    .endControlFlow()
-                    .endControlFlow()
-
-                screenBuilder
-                    .addAnnotation(ClassNames.composableClass)
-                    .addStatement(
-                        "val ${Variables.viewModel} = %T<${className}ViewModel>()",
-                        ClassNames.hiltViewModelClass
-                    )
-                    .addStatement("")
-                    .beginControlFlow(
-                        "val ${Variables.uiState}: %T<%T<${dataClass.simpleName}, %T>> = %T ", //{
-                        ClassNames.mutableStateClass,
-                        uiStateClass,
-                        errorClass,
-                        ClassNames.rememberSaveableClass
-                    )
-                    .addStatement(
-                        "%T(%T())",
-                        ClassNames.mutableStateOfClass,
-                        uiStateClass
-                    )
-                    .endControlFlow() //}
-                    .addStatement("")
-                    .beginControlFlow("%T(Unit)", ClassNames.launchedEffectClass)
-                    .addStatement("${Variables.viewModel}.${rPF_Select!!.simpleName}()")
-                    .endControlFlow()
-                    .addStatement("")
-                    .beginControlFlow("${Variables.viewModel}.${Variables.uiState}.value.let ")
-                    .addStatement("${Variables.uiState}.value = it")
-                    .endControlFlow() //}
-                    .addStatement("")
-                    .addStatement(
-                        "val ${Variables.openBottomSheet} = %T { %T(false) }",
-                        ClassNames.rememberSaveableClass,
-                        ClassNames.mutableStateOfClass
-                    )
-                    .addCode(
-                        """
-                    ${Elements.BaseScreen.name}(
-                        topBarText = %S,
-                        drawFullScreenContent = true,
-                        showLoading = ${Variables.uiState}.value.loading,
-                        floatingActionButton = {
-                            %T(onClick = { ${Variables.viewModel}.${rPF_Insert!!.simpleName}() }) {
-                                %T(imageVector = Icons.Default.Add, contentDescription = null)
-                            }
-                        },
-                        actions = {},
-                        bottomContent = {},
-                        showBottomSheet = ${Variables.openBottomSheet},
-                        bottomSheetContent = {
-                            %T(
-                                modifier = %T
-                                    .padding(basicMargin())
-                            ) {
-                                ${Variables.uiState}.value.data!!.detail?.let {
-                                    %T(
-                                        modifier = Modifier
-                                            .fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.End
-                                    ) {
-                                        %T(
-                                            onClick = {
-                                                ${Variables.viewModel}.${rPF_Delete!!.simpleName}(${Variables.uiState}.value.data!!.detail!!)
-                                                ${Variables.openBottomSheet}.value = false
-                                            }
-                                        ) {
-                                            %T(
-                                                imageVector = Icons.Default.Delete,
-                                                contentDescription = null
-                                            )
-                                        }
-                                    }
-                                    $propertiesCode
-                                }
-                            }
-                        }
-                    )   
-                """.trimIndent(),
-                        className,
-                        ClassNames.floatingActionButtonClass,
-                        ClassNames.iconClass,
-                        ClassNames.columnClass,
-                        ClassNames.modifierClass,
-                        ClassNames.rowClass,
-                        ClassNames.iconButtonClass,
-                        ClassNames.iconClass
-                    )
-                    .beginControlFlow("")
-                    .addStatement(
-                        "%T(${Variables.uiState} = ${Variables.uiState}.value, ${Variables.paddingValues} = it, ${Variables.openBottomSheet} = ${Variables.openBottomSheet}, ${Variables.viewModel} = ${Variables.viewModel})",
-                        ClassName(packageName, fileName + "Content")
-                    )
-                    .endControlFlow()
+                generateRapidPrototypeDatabase(
+                    packageName, className, fileName, uiStateClass, errorClass, rPF_Select, rPF_Insert, rPF_Delete, properties, repository, viewModelBuilder, screenContentBuilder, screenBuilder
+                )
             }
+
 
             val fileSpec = FileSpec.builder(packageName, fileName)
                 .addImport(ClassNames.textClass.packageName, ClassNames.textClass.simpleName)
+                .addImport("android.util", "Log")
                 .addImport("androidx.compose.foundation.layout", "fillMaxWidth")
                 .addImport("androidx.compose.foundation.layout", "Arrangement")
                 .addImport("androidx.compose.foundation.layout", "fillMaxSize")
@@ -485,6 +206,304 @@ class RapidPrototypeProcessor(
 
         return emptyList()
     }
+
+    private fun generateRapidPrototypeDatabase(
+        packageName: String,
+        className: String,
+        fileName: String,
+        uiStateClass: ClassName,
+        errorClass: ClassName,
+        rPF_Select: ClassName?,
+        rPF_Insert: ClassName?,
+        rPF_Delete: ClassName?,
+        properties: Sequence<KSPropertyDeclaration>,
+        repository: ClassName?,
+        viewModelBuilder: TypeSpec.Builder,
+        screenContentBuilder: FunSpec.Builder,
+        screenBuilder: FunSpec.Builder
+    ) {
+            // data class
+            val dataClass = generateDataClass(packageName, className)
+            // viewModel
+            // UISTATE
+            val uiStateTypeName = uiStateClass
+                .parameterizedBy(
+                    dataClass, errorClass
+                )
+
+            val mutableStateTypeName = ClassNames.mutableStateClass
+                .parameterizedBy(uiStateTypeName)
+
+            val uiStateProperty = PropertySpec.builder(Variables.uiState, mutableStateTypeName)
+                .initializer("%T(UiState())", ClassNames.mutableStateOfClass)
+                .build()
+            //UISTATE
+
+            //SELECT
+            val selectFun = FunSpec.builder(rPF_Select!!.simpleName)
+                .addModifiers(KModifier.OPEN)
+                .addCode("""
+                            %T {
+                                ${Variables.repository}.${rPF_Select!!.simpleName}()
+                                    .%T {
+                                        ${Variables.uiState}.value = UiState(loading = true, data = null, errors = null)
+                                    }
+                                    .%T {
+                                        ${Variables.uiState}.value = UiState(loading = false, data = null, errors = Error(0, it.localizedMessage))
+                                    }
+                                    .collect {
+                                        ${Variables.uiState}.value = UiState(loading = false, data = ${dataClass.simpleName}(list = it, detail = null), errors = null)
+                                    }
+                            }
+                        """.trimIndent(),
+                    ClassNames.launchClass,
+                    ClassNames.flowOnStartClass,
+                    ClassNames.flowCatchClass
+                )
+                .build()
+            //SELECT
+
+            //INSERT
+            val insertFun = FunSpec.builder(rPF_Insert!!.simpleName)
+                .addModifiers(KModifier.OPEN)
+                .addCode("""
+                            launch {
+                                val ${className.lowercase()} = init$className()
+                
+                                val id = ${Variables.repository}.${rPF_Insert!!.simpleName}(user)
+                
+                                if (id > 0) {
+                                    Log.d("Rapid Prototype", "Saved")
+                                } else {
+                                    Log.d("Rapid Prototype", "Not saved")
+                                }
+                            }
+                        """.trimIndent())
+                .build()
+            //INSERT
+
+            //DELETE
+            val deleteFun = FunSpec.builder(rPF_Delete!!.simpleName)
+                .addModifiers(KModifier.OPEN)
+                .addParameter(className.lowercase(), ClassName(packageName, className))
+                .addCode("""
+                            launch {
+                                ${Variables.repository}.${rPF_Delete!!.simpleName}(${className.lowercase()})
+                            }
+                        """.trimIndent())
+                .build()
+            //DELETE
+
+            //SET DETAIL
+            val setDetailFun = FunSpec.builder("set${className}Detail")
+                .addModifiers(KModifier.OPEN)
+                .addParameter(className.lowercase(), ClassName(packageName, className))
+                .addCode("""
+                            ${Variables.uiState}.value.data!!.detail = ${className.lowercase()}
+                        """.trimIndent())
+                .build()
+            //SET DETAIL
+
+            viewModelBuilder
+                .addAnnotation(ClassNames.daggerHiltViewModelClass)
+                .primaryConstructor(FunSpec.constructorBuilder()
+                    .addAnnotation(ClassNames.injectClass)
+                    .addParameter(Variables.repository, repository!!)
+                    .build())
+                .superclass(ClassName(packageName + Elements.BaseViewModel.packageName, Elements.BaseViewModel.name))
+                .addProperty(PropertySpec.builder(Variables.repository, repository!!, KModifier.PRIVATE).initializer(Variables.repository).build())
+                .addProperty(uiStateProperty)
+                .addFunction(selectFun)
+                .addFunction(insertFun)
+                .addFunction(deleteFun)
+                .addFunction(setDetailFun)
+                .addFunction(generateModelInitFunction(properties, ClassName(packageName, className)))
+                .addFunction(
+                    FunSpec.builder(Elements.RandomString.name)
+                        .returns(String::class)
+                        .addCode(Elements.RandomString.content)
+                        .build()
+                )
+                .addFunction(
+                    FunSpec.builder(Elements.RandomList.name)
+                        .addParameter("typeName", String::class)
+                        .returns(String::class)
+                        .addCode(Elements.RandomList.content)
+                        .build()
+                )
+                .build()
+
+
+            // making composable function
+            screenContentBuilder
+                .addAnnotation(ClassNames.composableClass)
+                .addParameter(
+                    Variables.uiState,
+                    uiStateTypeName
+                )
+                .addParameter(Variables.paddingValues, ClassNames.paddingValuesClass)
+                .addParameter(
+                    Variables.openBottomSheet,
+                    ClassNames.mutableStateClass.parameterizedBy(Boolean::class.asClassName())
+                )
+                .addParameter(Variables.viewModel, ClassName(packageName, "${className}ViewModel"))
+                .beginControlFlow(
+                    """
+                        %T(
+                            modifier = %T
+                                .fillMaxSize()           
+                        )
+                        """.trimIndent(),
+                    ClassNames.columnClass,
+                    ClassNames.modifierClass
+                )
+                .beginControlFlow("${Variables.uiState}.data?.let { data ->")
+                .beginControlFlow("data.list.forEachIndexed { index, it ->")
+                .beginControlFlow("if (index != 0) {")
+                .addStatement(
+                    """
+                        %T(
+                            modifier = %T
+                                .%T(start = halfMargin(), end = halfMargin())
+                                .%T(1.%T)
+                        )
+                    """.trimIndent(),
+                    ClassNames.dividerClass,
+                    ClassNames.modifierClass,
+                    ClassNames.paddingClass,
+                    ClassNames.heightClass,
+                    ClassNames.dpClass
+                )
+
+            var titleIndex = 0
+            properties.forEachIndexed { index, property ->
+                logger.warn("property: $property, $index")
+                if (property.simpleName.asString() == "id") {
+                    titleIndex = index
+                }
+            }
+            val firstPropertyName = properties.elementAt(titleIndex).simpleName.asString()
+            val secondPropertyName = properties.elementAt(titleIndex + 1).simpleName.asString()
+
+            val propertiesCode = properties.joinToString(separator = "\n") {
+                val propertyName = it.simpleName.asString()
+                """RapidRow(trailing = "$propertyName", leading = it.$propertyName.toString())"""
+            }
+
+            screenContentBuilder
+                .addStatement(
+                    """
+                        RapidListRow(
+                            title = it.$firstPropertyName.toString(),
+                            subtitle = it.$secondPropertyName.toString(),
+                            modifier = Modifier.%T {
+                                ${Variables.viewModel}.set${className}Detail(it)
+                                ${Variables.openBottomSheet}.value = true
+                            }
+                        )
+                    """.trimIndent(),
+                    ClassNames.clickableClass
+                )
+                .endControlFlow()
+                .endControlFlow()
+                .endControlFlow()
+                .endControlFlow()
+
+            screenBuilder
+                .addAnnotation(ClassNames.composableClass)
+                .addStatement(
+                    "val ${Variables.viewModel} = %T<${className}ViewModel>()",
+                    ClassNames.hiltViewModelClass
+                )
+                .addStatement("")
+                .beginControlFlow(
+                    "val ${Variables.uiState}: %T<%T<${dataClass.simpleName}, %T>> = %T ", //{
+                    ClassNames.mutableStateClass,
+                    uiStateClass,
+                    errorClass,
+                    ClassNames.rememberSaveableClass
+                )
+                .addStatement(
+                    "%T(%T())",
+                    ClassNames.mutableStateOfClass,
+                    uiStateClass
+                )
+                .endControlFlow() //}
+                .addStatement("")
+                .beginControlFlow("%T(Unit)", ClassNames.launchedEffectClass)
+                .addStatement("${Variables.viewModel}.${rPF_Select!!.simpleName}()")
+                .endControlFlow()
+                .addStatement("")
+                .beginControlFlow("${Variables.viewModel}.${Variables.uiState}.value.let ")
+                .addStatement("${Variables.uiState}.value = it")
+                .endControlFlow() //}
+                .addStatement("")
+                .addStatement(
+                    "val ${Variables.openBottomSheet} = %T { %T(false) }",
+                    ClassNames.rememberSaveableClass,
+                    ClassNames.mutableStateOfClass
+                )
+                .addCode(
+                    """
+                        ${Elements.BaseScreen.name}(
+                            topBarText = %S,
+                            drawFullScreenContent = false,
+                            showLoading = ${Variables.uiState}.value.loading,
+                            floatingActionButton = {
+                                %T(onClick = { ${Variables.viewModel}.${rPF_Insert!!.simpleName}() }) {
+                                    %T(imageVector = Icons.Default.Add, contentDescription = null)
+                                }
+                            },
+                            actions = {},
+                            bottomContent = {},
+                            showBottomSheet = ${Variables.openBottomSheet},
+                            bottomSheetContent = {
+                                %T(
+                                    modifier = %T
+                                        .padding(basicMargin())
+                                ) {
+                                    ${Variables.uiState}.value.data!!.detail?.let {
+                                        %T(
+                                            modifier = Modifier
+                                                .fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.End
+                                        ) {
+                                            %T(
+                                                onClick = {
+                                                    ${Variables.viewModel}.${rPF_Delete!!.simpleName}(${Variables.uiState}.value.data!!.detail!!)
+                                                    ${Variables.openBottomSheet}.value = false
+                                                }
+                                            ) {
+                                                %T(
+                                                    imageVector = Icons.Default.Delete,
+                                                    contentDescription = null
+                                                )
+                                            }
+                                        }
+                                        $propertiesCode
+                                    }
+                                }
+                            }
+                        )   
+                    """.trimIndent(),
+                    className,
+                    ClassNames.floatingActionButtonClass,
+                    ClassNames.iconClass,
+                    ClassNames.columnClass,
+                    ClassNames.modifierClass,
+                    ClassNames.rowClass,
+                    ClassNames.iconButtonClass,
+                    ClassNames.iconClass
+                )
+                .beginControlFlow("")
+                .addStatement(
+                    "%T(${Variables.uiState} = ${Variables.uiState}.value, ${Variables.paddingValues} = it, ${Variables.openBottomSheet} = ${Variables.openBottomSheet}, ${Variables.viewModel} = ${Variables.viewModel})",
+                    ClassName(packageName, fileName + "Content")
+                )
+                .endControlFlow()
+        }
+
+
     private fun generateModelInitFunction(properties: Sequence<KSPropertyDeclaration>, dataClass: ClassName): FunSpec {
         val codeBlockBuilder = CodeBlock.builder()
             .add("return %T(\n", dataClass)
