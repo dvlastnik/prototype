@@ -1,20 +1,19 @@
 package cz.mendelu.pef.xvlastni.compose_rapid_prototyping.di
 
-import cz.mendelu.pef.xvlastni.compose_rapid_prototyping.communication.IPetsRemoteRepository
 import cz.mendelu.pef.xvlastni.compose_rapid_prototyping.communication.PetsAPI
-import cz.mendelu.pef.xvlastni.compose_rapid_prototyping.communication.PetsRemoteRepositoryImpl
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import retrofit2.Retrofit
 import javax.inject.Singleton
 
 @Module
 @InstallIn(SingletonComponent::class)
-object RepositoryModule {
+object ApiModule {
 
     @Provides
     @Singleton
-    fun providePetsRemoteRepository(petsAPI: PetsAPI): IPetsRemoteRepository
-        = PetsRemoteRepositoryImpl(petsAPI)
+    fun providePetsAPI(retrofit: Retrofit): PetsAPI
+        = retrofit.create(PetsAPI::class.java)
 }
