@@ -7,7 +7,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
-import cz.mendelu.pef.xvlastni.compose_rapid_prototyping.model.UserScreen
+import cz.mendelu.pef.xvlastni.compose_rapid_prototyping.model.PetScreen
 import cz.mendelu.pef.xvlastni.compose_rapid_prototyping.ui.theme.ComposeRapidPrototypingTheme
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -22,7 +22,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    UserScreen()
+                    PetScreen()
                 }
             }
         }

@@ -27,6 +27,8 @@ object ClassNames {
     val flowCatchClass = ClassName("kotlinx.coroutines.flow", "catch")
     val flowOnStartClass = ClassName("kotlinx.coroutines.flow", "onStart")
     val launchClass = ClassName("kotlinx.coroutines", "launch")
+    val withContextClass = ClassName("kotlinx.coroutines", "withContext")
+    val dispatchersClass = ClassName("kotlinx.coroutines", "Dispatchers")
     val injectClass = ClassName("javax.inject", "Inject")
     val clickableClass = ClassName("androidx.compose.foundation", "clickable")
     val iconButtonClass = ClassName("androidx.compose.material3", "IconButton")
