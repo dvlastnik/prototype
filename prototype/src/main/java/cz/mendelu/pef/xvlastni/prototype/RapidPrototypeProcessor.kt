@@ -351,13 +351,14 @@ class RapidPrototypeProcessor(
                     """
                         %T(
                             modifier = %T
-                                .fillMaxSize()           
+                                .fillMaxSize()
                         )
                         """.trimIndent(),
                     ClassNames.columnClass,
                     ClassNames.modifierClass
                 )
                 .beginControlFlow("${Variables.uiState}.data?.let { data ->")
+                .addCode("Log.d(%S, data.list.size.toString())\n", "Size of list:")
                 .beginControlFlow("data.list.forEachIndexed { index, it ->")
                 .beginControlFlow("if (index != 0) {")
                 .addStatement(
@@ -391,6 +392,7 @@ class RapidPrototypeProcessor(
             }
 
             screenContentBuilder
+                .endControlFlow()
                 .addStatement(
                     """
                         RapidListRow(
@@ -404,7 +406,6 @@ class RapidPrototypeProcessor(
                     """.trimIndent(),
                     ClassNames.clickableClass
                 )
-                .endControlFlow()
                 .endControlFlow()
                 .endControlFlow()
                 .endControlFlow()
