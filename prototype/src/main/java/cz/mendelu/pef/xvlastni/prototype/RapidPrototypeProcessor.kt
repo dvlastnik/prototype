@@ -315,6 +315,12 @@ class RapidPrototypeProcessor(
                             topBarText = %S,
                             drawFullScreenContent = false,
                             showLoading = ${Variables.uiState}.value.loading,
+                            placeholderScreenContent = if (uiState.value.errors != null) {
+                                PlaceholderScreenContent(null, ${Variables.uiState}.value.errors!!.message)
+                            }
+                            else {
+                                null
+                            },
                             floatingActionButton = {
                                 %T(onClick = { ${Variables.viewModel}.${rPF_Select!!.simpleName}() }) {
                                     %T(imageVector = Icons.Default.Refresh, contentDescription = null)
@@ -452,7 +458,7 @@ class RapidPrototypeProcessor(
                                         ${Variables.uiState}.value = UiState(loading = true, data = null, errors = null)
                                     }
                                     .%T {
-                                        ${Variables.uiState}.value = UiState(loading = false, data = null, errors = Error(0, it.localizedMessage))
+                                        ${Variables.uiState}.value = UiState(loading = false, data = null, errors = %T(0, it.localizedMessage))
                                     }
                                     .collect {
                                         ${Variables.uiState}.value = UiState(loading = false, data = ${dataClass.simpleName}(list = it, detail = null), errors = null)
@@ -461,7 +467,8 @@ class RapidPrototypeProcessor(
                         """.trimIndent(),
                 ClassNames.launchClass,
                 ClassNames.flowOnStartClass,
-                ClassNames.flowCatchClass
+                ClassNames.flowCatchClass,
+                ClassName("cz.mendelu.pef.xvlastni.prototype.classes", "Error")
             )
             .build()
         //SELECT
@@ -619,6 +626,12 @@ class RapidPrototypeProcessor(
                             topBarText = %S,
                             drawFullScreenContent = false,
                             showLoading = ${Variables.uiState}.value.loading,
+                            placeholderScreenContent = if (uiState.value.errors != null) {
+                                PlaceholderScreenContent(null, ${Variables.uiState}.value.errors!!.message)
+                            }
+                            else {
+                                null
+                            },
                             floatingActionButton = {
                                 %T(onClick = { ${Variables.viewModel}.${rPF_Insert.simpleName}() }) {
                                     %T(imageVector = Icons.Default.Add, contentDescription = null)
@@ -720,6 +733,7 @@ class RapidPrototypeProcessor(
                 ClassNames.heightClass,
                 ClassNames.dpClass
             )
+            .endControlFlow()
             .addStatement(
                 """
                         RapidListRow(
@@ -733,7 +747,6 @@ class RapidPrototypeProcessor(
                     """.trimIndent(),
                 ClassNames.clickableClass
             )
-            .endControlFlow()
             .endControlFlow()
             .endControlFlow()
             .endControlFlow()

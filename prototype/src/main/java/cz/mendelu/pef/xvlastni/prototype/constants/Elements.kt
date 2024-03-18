@@ -129,7 +129,6 @@ object Elements {
                             maxLines = 1, 
                             overflow = TextOverflow.Ellipsis, 
                             style = TextStyle(
-                                fontWeight = FontWeight.Bold,
                                 fontSize = 16.sp
                             )
                         )
