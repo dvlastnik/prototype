@@ -60,6 +60,8 @@ class RapidPrototypeProcessor(
         var rPF_Select: ClassName? = null
         var rPF_Insert: ClassName? = null
         var rPF_Delete: ClassName? = null
+        var insertParameter: ClassName? = null
+        var deleteParameter: ClassName? = null
         rapidPrototypeFunction.forEach { symbol ->
             if (!symbol.validate()) return@forEach
 
@@ -77,13 +79,22 @@ class RapidPrototypeProcessor(
                     when (functionType) {
                         RapidPrototypeFunctionType.INSERT -> {
                             rPF_Insert = ClassName(symbol.packageName.asString(), symbol.simpleName.asString())
+
+                            symbol.parameters.forEach { parameter ->
+                                val parameterType = parameter.type.resolve()
+                                insertParameter = ClassName(parameterType.declaration.packageName.asString(), parameterType.declaration.simpleName.asString())
+                            }
                         }
                         RapidPrototypeFunctionType.SELECT -> {
                             rPF_Select = ClassName(symbol.packageName.asString(), symbol.simpleName.asString())
                         }
-                        // Handle other cases as necessary
                         RapidPrototypeFunctionType.DELETE -> {
                             rPF_Delete = ClassName(symbol.packageName.asString(), symbol.simpleName.asString())
+
+                            symbol.parameters.forEach { parameter ->
+                                val parameterType = parameter.type.resolve()
+                                deleteParameter = ClassName(parameterType.declaration.packageName.asString(), parameterType.declaration.simpleName.asString())
+                            }
                         }
                     }
                 }
@@ -193,12 +204,14 @@ class RapidPrototypeProcessor(
                 requireNotNull(repository) { "Repository is not annotated" }
 
                 //SELECT - GET
-                val selectFun = FunSpec.builder(rPF_Select!!.simpleName)
-                    .addModifiers(KModifier.OPEN)
-                    .addCode("""
+                var selectFun: FunSpec? = null
+                rPF_Select?.let {
+                    selectFun = FunSpec.builder(it.simpleName)
+                        .addModifiers(KModifier.OPEN)
+                        .addCode("""
                         %T {
                             val result = %T(%T.IO) {
-                                ${Variables.repository}.${rPF_Select!!.simpleName}()
+                                ${Variables.repository}.${it.simpleName}()
                             }
                             
                             when(result) {
@@ -207,23 +220,184 @@ class RapidPrototypeProcessor(
                                 is CommunicationResult.Error ->
                                     ${Variables.uiState}.value = UiState(loading = false, data = null, errors = Error(code = 1, message = %S))
                                 is CommunicationResult.Exception ->
-                                    ${Variables.uiState}.value = UiState(loading = false, data = null, errors = Error(code = 1, message = %S))
+                                    ${Variables.uiState}.value = UiState(loading = false, data = null, errors = Error(code = 2, message = %S))
                                 is CommunicationResult.Success ->
                                     ${Variables.uiState}.value = UiState(loading = false, data = %T(list = result.data), errors = null)
                             }
                         }
                     """.trimIndent(),
-                        ClassNames.launchClass,
-                        ClassNames.withContextClass,
-                        ClassNames.dispatchersClass,
-                        ClassName(packageName + Elements.Error.packageName, Elements.Error.name),
-                        "No internet",
-                        "Failed to load the list",
-                        "Unknown error",
-                        dataClass
+                            ClassNames.launchClass,
+                            ClassNames.withContextClass,
+                            ClassNames.dispatchersClass,
+                            ClassName(packageName + Elements.Error.packageName, Elements.Error.name),
+                            "No internet",
+                            "Failed to load the list",
+                            "Unknown error",
+                            dataClass
                         )
-                    .build()
+                        .build()
+                }
                 //SELECT - GET
+
+                //INSERT - POST
+                var insertFun: FunSpec? = null
+                rPF_Insert?.let {
+                    if (insertParameter != null) {
+                        insertFun = FunSpec.builder(it.simpleName)
+                            .addParameter(className.lowercase(), insertParameter!!)
+                            .addModifiers(KModifier.OPEN)
+                            .addCode(
+                                """
+                                %T {
+                                    val result = %T(%T.IO) {
+                                        ${Variables.repository}.${it.simpleName}(${className.lowercase()})
+                                    }
+                                    
+                                    when (result) {
+                                        is CommunicationResult.CommunicationError ->
+                                        ${Variables.uiState}.value = UiState(loading = false, data = null, errors = %T(code = 0 ,message = %S))
+                                    is CommunicationResult.Error ->
+                                        ${Variables.uiState}.value = UiState(loading = false, data = null, errors = Error(code = 1, message = %S))
+                                    is CommunicationResult.Exception ->
+                                        ${Variables.uiState}.value = UiState(loading = false, data = null, errors = Error(code = 2, message = %S))
+                                    is CommunicationResult.Success ->
+                                        Log.d("Saved", ${Variables.uiState}.value.data.toString())
+                                        ${selectFun!!.name}()
+                                    }
+                                }
+                                """.trimIndent(),
+                                    ClassNames.launchClass,
+                                    ClassNames.withContextClass,
+                                    ClassNames.dispatchersClass,
+                                    ClassName(
+                                        packageName + Elements.Error.packageName,
+                                        Elements.Error.name
+                                    ),
+                                    "No internet",
+                                    "Failed to load the list",
+                                    "Unknown error"
+                                )
+                            .build()
+                    }
+                    else {
+                        insertFun = FunSpec.builder(it.simpleName)
+                            .addModifiers(KModifier.OPEN)
+                            .addCode(
+                                """
+                                %T {
+                                    val result = %T(%T.IO) {
+                                        ${Variables.repository}.${it.simpleName}()
+                                    }
+                                    
+                                    when (result) {
+                                        is CommunicationResult.CommunicationError ->
+                                        ${Variables.uiState}.value = UiState(loading = false, data = null, errors = %T(code = 0 ,message = %S))
+                                    is CommunicationResult.Error ->
+                                        ${Variables.uiState}.value = UiState(loading = false, data = null, errors = Error(code = 1, message = %S))
+                                    is CommunicationResult.Exception ->
+                                        ${Variables.uiState}.value = UiState(loading = false, data = null, errors = Error(code = 2, message = %S))
+                                    is CommunicationResult.Success ->
+                                        Log.d("Saved", ${Variables.uiState}.value.data.toString())
+                                        ${selectFun!!.name}()
+                                    }
+                                }
+                                """.trimIndent(),
+                                        ClassNames.launchClass,
+                                        ClassNames.withContextClass,
+                                        ClassNames.dispatchersClass,
+                                        ClassName(
+                                            packageName + Elements.Error.packageName,
+                                            Elements.Error.name
+                                        ),
+                                        "No internet",
+                                        "Failed to load the list",
+                                        "Unknown error",
+                                        dataClass
+                                    )
+                            .build()
+                    }
+                }
+                //INSERT - POST
+
+                //DELETE - DELETE
+                var deleteFun: FunSpec? = null
+                rPF_Delete?.let {
+                    if (deleteParameter != null) {
+                        deleteFun = FunSpec.builder(it.simpleName)
+                            .addParameter(className.lowercase(), deleteParameter!!)
+                            .addModifiers(KModifier.OPEN)
+                            .addCode(
+                                """
+                                %T {
+                                    val result = %T(%T.IO) {
+                                        ${Variables.repository}.${it.simpleName}(${className.lowercase()})
+                                    }
+                                    
+                                    when (result) {
+                                        is CommunicationResult.CommunicationError ->
+                                        ${Variables.uiState}.value = UiState(loading = false, data = null, errors = %T(code = 0 ,message = %S))
+                                    is CommunicationResult.Error ->
+                                        ${Variables.uiState}.value = UiState(loading = false, data = null, errors = Error(code = 1, message = %S))
+                                    is CommunicationResult.Exception ->
+                                        ${Variables.uiState}.value = UiState(loading = false, data = null, errors = Error(code = 2, message = %S))
+                                    is CommunicationResult.Success ->
+                                        Log.d("Saved", ${Variables.uiState}.value.data.toString())
+                                        ${selectFun!!.name}()
+                                    }
+                                }
+                                """.trimIndent(),
+                                ClassNames.launchClass,
+                                ClassNames.withContextClass,
+                                ClassNames.dispatchersClass,
+                                ClassName(
+                                    packageName + Elements.Error.packageName,
+                                    Elements.Error.name
+                                ),
+                                "No internet",
+                                "Failed to load the list",
+                                "Unknown error"
+                            )
+                            .build()
+                    }
+                    else {
+                        deleteFun = FunSpec.builder(it.simpleName)
+                            .addModifiers(KModifier.OPEN)
+                            .addCode(
+                            """
+                                %T {
+                                    val result = %T(%T.IO) {
+                                        ${Variables.repository}.${it.simpleName}()
+                                    }
+                                    
+                                    when (result) {
+                                        is CommunicationResult.CommunicationError ->
+                                        ${Variables.uiState}.value = UiState(loading = false, data = null, errors = %T(code = 0 ,message = %S))
+                                    is CommunicationResult.Error ->
+                                        ${Variables.uiState}.value = UiState(loading = false, data = null, errors = Error(code = 1, message = %S))
+                                    is CommunicationResult.Exception ->
+                                        ${Variables.uiState}.value = UiState(loading = false, data = null, errors = Error(code = 2, message = %S))
+                                    is CommunicationResult.Success ->
+                                        Log.d("Saved", ${Variables.uiState}.value.data.toString())
+                                        ${selectFun!!.name}()
+                                    }
+                                }
+                                """.trimIndent(),
+                                ClassNames.launchClass,
+                                ClassNames.withContextClass,
+                                ClassNames.dispatchersClass,
+                                ClassName(
+                                    packageName + Elements.Error.packageName,
+                                    Elements.Error.name
+                                ),
+                                "No internet",
+                                "Failed to load the list",
+                                "Unknown error",
+                                dataClass
+                            )
+                            .build()
+                    }
+                }
+                //DELETE - DELETE
 
                 //SET DETAIL
                 val setDetailFun = createSetDetailFunSpec(className, packageName)
@@ -238,13 +412,17 @@ class RapidPrototypeProcessor(
                     .superclass(ClassName(packageName + Elements.BaseViewModel.packageName, Elements.BaseViewModel.name))
                     .addProperty(PropertySpec.builder(Variables.repository, repository!!, KModifier.PRIVATE).initializer(Variables.repository).build())
                     .addProperty(uiStateProperty)
-                    .addInitializerBlock(CodeBlock.of(
-                        """
-                            ${rPF_Select!!.simpleName}()
-                        """.trimIndent()
-                    ))
-                    .addFunction(selectFun)
                     .addFunction(setDetailFun)
+
+                selectFun?.let {
+                    viewModelBuilder
+                        .addFunction(it)
+                }
+
+                insertFun?.let {
+                    viewModelBuilder
+                        .addFunction(it)
+                }
 
                 var titleIndex = 0
                 properties.forEachIndexed { index, property ->
@@ -379,6 +557,9 @@ class RapidPrototypeProcessor(
 
             val fileSpec = FileSpec.builder(packageName, fileName)
                 .addImport(ClassNames.textClass.packageName, ClassNames.textClass.simpleName)
+                .addImport(ClassNames.floatingActionButtonClass.packageName, ClassNames.floatingActionButtonClass.simpleName)
+                .addImport(ClassNames.iconButtonClass.packageName, ClassNames.floatingActionButtonClass.simpleName)
+                .addImport(ClassNames.iconClass.packageName, ClassNames.iconClass.simpleName)
                 .addImport("android.util", "Log")
                 .addImport("androidx.compose.foundation.layout", "fillMaxWidth")
                 .addImport("androidx.compose.foundation.layout", "Arrangement")
@@ -448,12 +629,14 @@ class RapidPrototypeProcessor(
         //UISTATE
 
         //SELECT
-        val selectFun = FunSpec.builder(rPF_Select!!.simpleName)
-            .addModifiers(KModifier.OPEN)
-            .addCode(
-                """
+        var selectFun: FunSpec? = null
+        rPF_Select?.let {
+            selectFun = FunSpec.builder(it.simpleName)
+                .addModifiers(KModifier.OPEN)
+                .addCode(
+                    """
                             %T {
-                                ${Variables.repository}.${rPF_Select.simpleName}()
+                                ${Variables.repository}.${it.simpleName}()
                                     .%T {
                                         ${Variables.uiState}.value = UiState(loading = true, data = null, errors = null)
                                     }
@@ -465,23 +648,26 @@ class RapidPrototypeProcessor(
                                     }
                             }
                         """.trimIndent(),
-                ClassNames.launchClass,
-                ClassNames.flowOnStartClass,
-                ClassNames.flowCatchClass,
-                ClassName("cz.mendelu.pef.xvlastni.prototype.classes", "Error")
-            )
-            .build()
+                    ClassNames.launchClass,
+                    ClassNames.flowOnStartClass,
+                    ClassNames.flowCatchClass,
+                    ClassName("cz.mendelu.pef.xvlastni.prototype.classes", "Error")
+                )
+                .build()
+        }
         //SELECT
 
         //INSERT
-        val insertFun = FunSpec.builder(rPF_Insert!!.simpleName)
-            .addModifiers(KModifier.OPEN)
-            .addCode(
-                """
+        var insertFun: FunSpec? = null
+        rPF_Insert?.let {
+            insertFun = FunSpec.builder(it.simpleName)
+                .addModifiers(KModifier.OPEN)
+                .addCode(
+                    """
                             launch {
                                 val ${className.lowercase()} = init$className()
                 
-                                val id = ${Variables.repository}.${rPF_Insert.simpleName}(user)
+                                val id = ${Variables.repository}.${it.simpleName}(user)
                 
                                 if (id > 0) {
                                     Log.d("Rapid Prototype", "Saved")
@@ -490,22 +676,26 @@ class RapidPrototypeProcessor(
                                 }
                             }
                         """.trimIndent()
-            )
-            .build()
+                )
+                .build()
+        }
         //INSERT
 
         //DELETE
-        val deleteFun = FunSpec.builder(rPF_Delete!!.simpleName)
-            .addModifiers(KModifier.OPEN)
-            .addParameter(className.lowercase(), ClassName(packageName, className))
-            .addCode(
-                """
+        var deleteFun: FunSpec? = null
+        rPF_Delete?.let {
+            deleteFun = FunSpec.builder(it.simpleName)
+                .addModifiers(KModifier.OPEN)
+                .addParameter(className.lowercase(), ClassName(packageName, className))
+                .addCode(
+                    """
                             launch {
-                                ${Variables.repository}.${rPF_Delete.simpleName}(${className.lowercase()})
+                                ${Variables.repository}.${it.simpleName}(${className.lowercase()})
                             }
                         """.trimIndent()
-            )
-            .build()
+                )
+                .build()
+        }
         //DELETE
 
         //SET DETAIL
@@ -533,9 +723,47 @@ class RapidPrototypeProcessor(
                     .initializer(Variables.repository).build()
             )
             .addProperty(uiStateProperty)
-            .addFunction(selectFun)
-            .addFunction(insertFun)
-            .addFunction(deleteFun)
+
+        selectFun?.let {
+            viewModelBuilder
+                .addFunction(it)
+        }
+
+        var fabInsert = "{},"
+        insertFun?.let {
+            viewModelBuilder
+                .addFunction(it)
+
+            fabInsert = """
+                {
+                    FloatingActionButton(onClick = { ${Variables.viewModel}.${rPF_Insert!!.simpleName}() }) {
+                        Icon(imageVector = Icons.Default.Add, contentDescription = null)
+                    }
+                },
+            """.trimIndent()
+        }
+
+        var iconDelete = ""
+        deleteFun?.let {
+            viewModelBuilder
+                .addFunction(it)
+
+            iconDelete = """
+                IconButton(
+                    onClick = {
+                        ${Variables.viewModel}.${rPF_Delete!!.simpleName}(${Variables.uiState}.value.data!!.detail!!)
+                        ${Variables.openBottomSheet}.value = false
+                    }
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = null
+                    )
+                }
+            """.trimIndent()
+        }
+
+        viewModelBuilder
             .addFunction(setDetailFun)
             .addFunction(generateModelInitFunction(properties, ClassName(packageName, className)))
             .addFunction(
@@ -606,10 +834,16 @@ class RapidPrototypeProcessor(
                 uiStateClass
             )
             .endControlFlow() //}
-            .addStatement("")
-            .beginControlFlow("%T(Unit)", ClassNames.launchedEffectClass)
-            .addStatement("${Variables.viewModel}.${rPF_Select.simpleName}()")
-            .endControlFlow()
+
+        rPF_Select?.let {
+            screenBuilder
+                .addStatement("")
+                .beginControlFlow("%T(Unit)", ClassNames.launchedEffectClass)
+                .addStatement("${Variables.viewModel}.${it.simpleName}()")
+                .endControlFlow()
+        }
+
+        screenBuilder
             .addStatement("")
             .beginControlFlow("${Variables.viewModel}.${Variables.uiState}.value.let ")
             .addStatement("${Variables.uiState}.value = it")
@@ -632,11 +866,7 @@ class RapidPrototypeProcessor(
                             else {
                                 null
                             },
-                            floatingActionButton = {
-                                %T(onClick = { ${Variables.viewModel}.${rPF_Insert.simpleName}() }) {
-                                    %T(imageVector = Icons.Default.Add, contentDescription = null)
-                                }
-                            },
+                            floatingActionButton = $fabInsert
                             actions = {},
                             bottomContent = {},
                             showBottomSheet = ${Variables.openBottomSheet},
@@ -651,17 +881,7 @@ class RapidPrototypeProcessor(
                                                 .fillMaxWidth(),
                                             horizontalArrangement = Arrangement.End
                                         ) {
-                                            %T(
-                                                onClick = {
-                                                    ${Variables.viewModel}.${rPF_Delete.simpleName}(${Variables.uiState}.value.data!!.detail!!)
-                                                    ${Variables.openBottomSheet}.value = false
-                                                }
-                                            ) {
-                                                %T(
-                                                    imageVector = Icons.Default.Delete,
-                                                    contentDescription = null
-                                                )
-                                            }
+                                            $iconDelete
                                         }
                                         ${className}BottomSheetContent(it)
                                     }
@@ -670,13 +890,9 @@ class RapidPrototypeProcessor(
                         )   
                     """.trimIndent(),
                 className,
-                ClassNames.floatingActionButtonClass,
-                ClassNames.iconClass,
                 ClassNames.columnClass,
                 ClassNames.modifierClass,
-                ClassNames.rowClass,
-                ClassNames.iconButtonClass,
-                ClassNames.iconClass
+                ClassNames.rowClass
             )
             .beginControlFlow("")
             .addStatement(
