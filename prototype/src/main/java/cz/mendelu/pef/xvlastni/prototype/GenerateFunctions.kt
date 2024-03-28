@@ -17,6 +17,405 @@ import cz.mendelu.pef.xvlastni.prototype.constants.ClassNames
 import cz.mendelu.pef.xvlastni.prototype.constants.Elements
 import cz.mendelu.pef.xvlastni.prototype.constants.Variables
 
+fun generateRapidPrototypeApi(
+    packageName: String,
+    className: String,
+    fileName: String,
+    uiStateClass: ClassName,
+    errorClass: ClassName,
+    repository: ClassName?,
+    rPF_Select: ClassName?,
+    rPF_Insert: ClassName?,
+    rPF_Delete: ClassName?,
+    properties: Sequence<KSPropertyDeclaration>,
+    insertParameter: ClassName?,
+    deleteParameter: ClassName?,
+    deleteParameterName: String,
+    viewModelBuilder: TypeSpec.Builder,
+    screenContentBuilder: FunSpec.Builder,
+    screenBuilder: FunSpec.Builder,
+    bottomSheetContentBuilder: FunSpec.Builder,
+    codeGenerator: CodeGenerator
+) {
+    // data class
+    val dataClass = generateDataClass(packageName, className, codeGenerator)
+    // viewModel
+    // UISTATE
+    val uiStateTypeName = uiStateClass
+        .parameterizedBy(
+            dataClass, errorClass
+        )
+
+    val mutableStateTypeName = ClassNames.mutableStateClass
+        .parameterizedBy(uiStateTypeName)
+
+    val uiStateProperty = PropertySpec.builder(Variables.uiState, mutableStateTypeName)
+        .initializer("%T(UiState())", ClassNames.mutableStateOfClass)
+        .build()
+    //UISTATE
+
+    requireNotNull(repository) { "Repository is not annotated" }
+
+    //SELECT - GET
+    var selectFun: FunSpec? = null
+    rPF_Select?.let {
+        selectFun = FunSpec.builder(it.simpleName)
+            .addModifiers(KModifier.OPEN)
+            .addCode("""
+                        %T {
+                            val result = %T(%T.IO) {
+                                ${Variables.repository}.${it.simpleName}()
+                            }
+                            
+                            when(result) {
+                                is CommunicationResult.CommunicationError ->
+                                    ${Variables.uiState}.value = UiState(loading = false, data = null, errors = %T(code = 0 ,message = %S))
+                                is CommunicationResult.Error ->
+                                    ${Variables.uiState}.value = UiState(loading = false, data = null, errors = Error(code = 1, message = %S))
+                                is CommunicationResult.Exception ->
+                                    ${Variables.uiState}.value = UiState(loading = false, data = null, errors = Error(code = 2, message = %S))
+                                is CommunicationResult.Success ->
+                                    ${Variables.uiState}.value = UiState(loading = false, data = %T(list = result.data), errors = null)
+                            }
+                        }
+                    """.trimIndent(),
+                ClassNames.launchClass,
+                ClassNames.withContextClass,
+                ClassNames.dispatchersClass,
+                ClassName(packageName + Elements.Error.packageName, Elements.Error.name),
+                "No internet",
+                "Failed to load the list",
+                "Unknown error",
+                dataClass
+            )
+            .build()
+    }
+    //SELECT - GET
+
+    //INSERT - POST
+    var insertFun: FunSpec? = null
+    rPF_Insert?.let {
+        if (insertParameter != null) {
+            insertFun = FunSpec.builder(it.simpleName)
+                .addParameter(className.lowercase(), insertParameter!!)
+                .addModifiers(KModifier.OPEN)
+                .addCode(
+                    """
+                                %T {
+                                    val result = %T(%T.IO) {
+                                        ${Variables.repository}.${it.simpleName}(${className.lowercase()})
+                                    }
+                                    
+                                    when (result) {
+                                        is CommunicationResult.CommunicationError ->
+                                        ${Variables.uiState}.value = UiState(loading = false, data = null, errors = %T(code = 0 ,message = %S))
+                                    is CommunicationResult.Error ->
+                                        ${Variables.uiState}.value = UiState(loading = false, data = null, errors = Error(code = 1, message = %S))
+                                    is CommunicationResult.Exception ->
+                                        ${Variables.uiState}.value = UiState(loading = false, data = null, errors = Error(code = 2, message = %S))
+                                    is CommunicationResult.Success -> {
+                                            Log.d("Saved", ${Variables.uiState}.value.data.toString())
+                                            ${Variables.repository}.${selectFun!!.name}()
+                                        }
+                                    }
+                                }
+                                """.trimIndent(),
+                    ClassNames.launchClass,
+                    ClassNames.withContextClass,
+                    ClassNames.dispatchersClass,
+                    ClassName(
+                        packageName + Elements.Error.packageName,
+                        Elements.Error.name
+                    ),
+                    "No internet",
+                    "Failed to load the list",
+                    "Unknown error"
+                )
+                .build()
+        }
+        else {
+            insertFun = FunSpec.builder(it.simpleName)
+                .addModifiers(KModifier.OPEN)
+                .addCode(
+                    """
+                                %T {
+                                    val result = %T(%T.IO) {
+                                        ${Variables.repository}.${it.simpleName}()
+                                    }
+                                    
+                                    when (result) {
+                                        is CommunicationResult.CommunicationError ->
+                                        ${Variables.uiState}.value = UiState(loading = false, data = null, errors = %T(code = 0 ,message = %S))
+                                    is CommunicationResult.Error ->
+                                        ${Variables.uiState}.value = UiState(loading = false, data = null, errors = Error(code = 1, message = %S))
+                                    is CommunicationResult.Exception ->
+                                        ${Variables.uiState}.value = UiState(loading = false, data = null, errors = Error(code = 2, message = %S))
+                                    is CommunicationResult.Success -> {
+                                            Log.d("Saved", ${Variables.uiState}.value.data.toString())
+                                            ${Variables.repository}.${selectFun!!.name}()
+                                        }
+                                    }
+                                }
+                                """.trimIndent(),
+                    ClassNames.launchClass,
+                    ClassNames.withContextClass,
+                    ClassNames.dispatchersClass,
+                    ClassName(
+                        packageName + Elements.Error.packageName,
+                        Elements.Error.name
+                    ),
+                    "No internet",
+                    "Failed to load the list",
+                    "Unknown error",
+                    dataClass
+                )
+                .build()
+        }
+    }
+    //INSERT - POST
+
+    //DELETE - DELETE
+    var deleteFun: FunSpec? = null
+    rPF_Delete?.let {
+        if (deleteParameter != null) {
+            deleteFun = FunSpec.builder(it.simpleName)
+                .addParameter(className.lowercase(), deleteParameter!!)
+                .addModifiers(KModifier.OPEN)
+                .addCode(
+                    """
+                                %T {
+                                    val result = %T(%T.IO) {
+                                        ${Variables.repository}.${it.simpleName}(${className.lowercase()})
+                                    }
+                                    
+                                    when (result) {
+                                        is CommunicationResult.CommunicationError ->
+                                        ${Variables.uiState}.value = UiState(loading = false, data = null, errors = %T(code = 0 ,message = %S))
+                                    is CommunicationResult.Error ->
+                                        ${Variables.uiState}.value = UiState(loading = false, data = null, errors = Error(code = 1, message = %S))
+                                    is CommunicationResult.Exception ->
+                                        ${Variables.uiState}.value = UiState(loading = false, data = null, errors = Error(code = 2, message = %S))
+                                    is CommunicationResult.Success -> {
+                                            Log.d("Saved", ${Variables.uiState}.value.data.toString())
+                                            ${Variables.repository}.${selectFun!!.name}()
+                                        }
+                                    }
+                                }
+                                """.trimIndent(),
+                    ClassNames.launchClass,
+                    ClassNames.withContextClass,
+                    ClassNames.dispatchersClass,
+                    ClassName(
+                        packageName + Elements.Error.packageName,
+                        Elements.Error.name
+                    ),
+                    "No internet",
+                    "Failed to load the list",
+                    "Unknown error"
+                )
+                .build()
+        }
+        else {
+            deleteFun = FunSpec.builder(it.simpleName)
+                .addModifiers(KModifier.OPEN)
+                .addCode(
+                    """
+                                %T {
+                                    val result = %T(%T.IO) {
+                                        ${Variables.repository}.${it.simpleName}()
+                                    }
+                                    
+                                    when (result) {
+                                        is CommunicationResult.CommunicationError ->
+                                        ${Variables.uiState}.value = UiState(loading = false, data = null, errors = %T(code = 0 ,message = %S))
+                                    is CommunicationResult.Error ->
+                                        ${Variables.uiState}.value = UiState(loading = false, data = null, errors = Error(code = 1, message = %S))
+                                    is CommunicationResult.Exception ->
+                                        ${Variables.uiState}.value = UiState(loading = false, data = null, errors = Error(code = 2, message = %S))
+                                    is CommunicationResult.Success -> {
+                                            Log.d("Saved", ${Variables.uiState}.value.data.toString())
+                                            ${Variables.repository}.${selectFun!!.name}()
+                                        }
+                                    }
+                                }
+                                """.trimIndent(),
+                    ClassNames.launchClass,
+                    ClassNames.withContextClass,
+                    ClassNames.dispatchersClass,
+                    ClassName(
+                        packageName + Elements.Error.packageName,
+                        Elements.Error.name
+                    ),
+                    "No internet",
+                    "Failed to load the list",
+                    "Unknown error",
+                    dataClass
+                )
+                .build()
+        }
+    }
+    //DELETE - DELETE
+
+    //SET DETAIL
+    val setDetailFun = createSetDetailFunSpec(className, packageName)
+    //SET DETAIL
+
+    viewModelBuilder
+        .addAnnotation(ClassNames.daggerHiltViewModelClass)
+        .primaryConstructor(FunSpec.constructorBuilder()
+            .addAnnotation(ClassNames.injectClass)
+            .addParameter(Variables.repository, repository!!)
+            .build())
+        .superclass(ClassName(packageName + Elements.BaseViewModel.packageName, Elements.BaseViewModel.name))
+        .addProperty(PropertySpec.builder(Variables.repository, repository!!, KModifier.PRIVATE).initializer(Variables.repository).build())
+        .addProperty(uiStateProperty)
+        .addFunction(setDetailFun)
+
+    selectFun?.let {
+        viewModelBuilder
+            .addFunction(it)
+    }
+
+    insertFun?.let {
+        viewModelBuilder
+            .addFunction(it)
+    }
+
+    var iconDelete = ""
+    deleteFun?.let {
+        viewModelBuilder
+            .addFunction(it)
+
+        iconDelete = """
+                        IconButton(
+                            onClick = {
+                                ${Variables.viewModel}.${rPF_Delete!!.simpleName}(it.${deleteParameterName}!!)
+                                ${Variables.openBottomSheet}.value = false
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = null
+                            )
+                        }
+                    """.trimIndent()
+    }
+
+    var titleIndex = 0
+    properties.forEachIndexed { index, property ->
+        if (property.simpleName.asString() == "id") {
+            titleIndex = index
+        }
+    }
+    val firstPropertyName = properties.elementAt(titleIndex).simpleName.asString()
+    val secondPropertyName = properties.elementAt(titleIndex + 1).simpleName.asString()
+
+    val propertiesCode = properties.joinToString(separator = "\n") {
+        val propertyName = it.simpleName.asString()
+        """RapidRow(trailing = "$propertyName", leading = it.$propertyName.toString())"""
+    }
+
+    //create content
+    createScreenContentForList(
+        screenContentBuilder, uiStateTypeName, packageName, className, firstPropertyName, secondPropertyName
+    )
+
+    //create bottom sheet content
+    createBottomSheetContent(
+        bottomSheetContentBuilder = bottomSheetContentBuilder,
+        packageName = packageName,
+        className = className,
+        propertiesCode = propertiesCode
+    )
+
+    //create screen
+    screenBuilder
+        .addAnnotation(ClassNames.composableClass)
+        .addStatement(
+            "val ${Variables.viewModel} = %T<${className}ViewModel>()",
+            ClassNames.hiltViewModelClass
+        )
+        .addStatement("")
+        .beginControlFlow(
+            "val ${Variables.uiState}: %T<%T<${dataClass.simpleName}, %T>> = %T ", //{
+            ClassNames.mutableStateClass,
+            uiStateClass,
+            errorClass,
+            ClassNames.rememberSaveableClass
+        )
+        .addStatement(
+            "%T(%T())",
+            ClassNames.mutableStateOfClass,
+            uiStateClass
+        )
+        .endControlFlow() //}
+        .addStatement("")
+        .beginControlFlow("%T(Unit)", ClassNames.launchedEffectClass)
+        .addStatement("${Variables.viewModel}.${rPF_Select!!.simpleName}()")
+        .endControlFlow()
+        .addStatement("")
+        .beginControlFlow("${Variables.viewModel}.${Variables.uiState}.value.let ")
+        .addStatement("${Variables.uiState}.value = it")
+        .endControlFlow() //}
+        .addStatement("")
+        .addStatement(
+            "val ${Variables.openBottomSheet} = %T { %T(false) }",
+            ClassNames.rememberSaveableClass,
+            ClassNames.mutableStateOfClass
+        )
+        .addCode(
+            """
+                        ${Elements.BaseScreen.name}(
+                            topBarText = %S,
+                            drawFullScreenContent = false,
+                            showLoading = ${Variables.uiState}.value.loading,
+                            placeholderScreenContent = if (uiState.value.errors != null) {
+                                PlaceholderScreenContent(null, ${Variables.uiState}.value.errors!!.message)
+                            }
+                            else {
+                                null
+                            },
+                            floatingActionButton = {
+                                %T(onClick = { ${Variables.viewModel}.${rPF_Select!!.simpleName}() }) {
+                                    %T(imageVector = Icons.Default.Refresh, contentDescription = null)
+                                }
+                            },
+                            actions = {},
+                            bottomContent = {},
+                            showBottomSheet = ${Variables.openBottomSheet},
+                            bottomSheetContent = {
+                                %T(
+                                    modifier = %T
+                                        .padding(basicMargin())
+                                ) {
+                                    ${Variables.uiState}.value.data!!.detail?.let {
+                                        %T(
+                                            modifier = Modifier
+                                                .fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.End
+                                        ) {
+                                            $iconDelete
+                                        }
+                                        ${className}BottomSheetContent(it)
+                                    }
+                                }
+                            }
+                        )   
+                    """.trimIndent(),
+            className,
+            ClassNames.floatingActionButtonClass,
+            ClassNames.iconClass,
+            ClassNames.columnClass,
+            ClassNames.modifierClass,
+            ClassNames.rowClass
+        )
+        .beginControlFlow("")
+        .addStatement(
+            "%T(${Variables.uiState} = ${Variables.uiState}.value, ${Variables.paddingValues} = it, ${Variables.openBottomSheet} = ${Variables.openBottomSheet}, ${Variables.viewModel} = ${Variables.viewModel})",
+            ClassName(packageName, fileName + "Content")
+        )
+        .endControlFlow()
+}
 fun generateRapidPrototypeDatabase(
     packageName: String,
     className: String,
