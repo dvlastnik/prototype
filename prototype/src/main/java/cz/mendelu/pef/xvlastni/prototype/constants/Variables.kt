@@ -6,4 +6,5 @@ object Variables {
     val paddingValues = "paddingValues"
     val openBottomSheet = "openBottomSheet"
     val repository = "repository"
+    val whatToInsert = "whatToInsert"
 }

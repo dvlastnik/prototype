@@ -17,7 +17,7 @@ import cz.mendelu.pef.xvlastni.prototype.constants.ClassNames
 import cz.mendelu.pef.xvlastni.prototype.constants.Elements
 import cz.mendelu.pef.xvlastni.prototype.constants.Variables
 
-fun generateRapidPrototypeApi(
+fun generateRapidPrototypeApiList(
     packageName: String,
     className: String,
     fileName: String,
@@ -57,8 +57,12 @@ fun generateRapidPrototypeApi(
     requireNotNull(repository) { "Repository is not annotated" }
 
     //SELECT - GET
+    var fabOnClick = ""
+    var fabIcon = "Icons.Default.Refresh"
     var selectFun: FunSpec? = null
     rPF_Select?.let {
+        fabOnClick = "${Variables.viewModel}.${it.simpleName}()"
+
         selectFun = FunSpec.builder(it.simpleName)
             .addModifiers(KModifier.OPEN)
             .addCode("""
@@ -95,7 +99,9 @@ fun generateRapidPrototypeApi(
     //INSERT - POST
     var insertFun: FunSpec? = null
     rPF_Insert?.let {
+        fabIcon = "Icons.Default.Add"
         if (insertParameter != null) {
+            fabOnClick = "${Variables.viewModel}.${it.simpleName}(${Variables.whatToInsert})"
             insertFun = FunSpec.builder(it.simpleName)
                 .addParameter(className.lowercase(), insertParameter!!)
                 .addModifiers(KModifier.OPEN)
@@ -134,6 +140,8 @@ fun generateRapidPrototypeApi(
                 .build()
         }
         else {
+            fabOnClick = "${Variables.viewModel}.${it.simpleName}()"
+
             insertFun = FunSpec.builder(it.simpleName)
                 .addModifiers(KModifier.OPEN)
                 .addCode(
@@ -331,6 +339,13 @@ fun generateRapidPrototypeApi(
     //create screen
     screenBuilder
         .addAnnotation(ClassNames.composableClass)
+
+    if (insertParameter != null) {
+        screenBuilder
+            .addParameter(Variables.whatToInsert, insertParameter)
+    }
+
+    screenBuilder
         .addStatement(
             "val ${Variables.viewModel} = %T<${className}ViewModel>()",
             ClassNames.hiltViewModelClass
@@ -376,8 +391,8 @@ fun generateRapidPrototypeApi(
                                 null
                             },
                             floatingActionButton = {
-                                %T(onClick = { ${Variables.viewModel}.${rPF_Select!!.simpleName}() }) {
-                                    %T(imageVector = Icons.Default.Refresh, contentDescription = null)
+                                %T(onClick = { $fabOnClick }) {
+                                    %T(imageVector = $fabIcon, contentDescription = null)
                                 }
                             },
                             actions = {},
@@ -426,6 +441,7 @@ fun generateRapidPrototypeDatabase(
     rPF_Insert: ClassName?,
     rPF_Delete: ClassName?,
     properties: Sequence<KSPropertyDeclaration>,
+    insertParameter: ClassName?,
     repository: ClassName?,
     viewModelBuilder: TypeSpec.Builder,
     screenContentBuilder: FunSpec.Builder,
@@ -482,14 +498,16 @@ fun generateRapidPrototypeDatabase(
     //INSERT
     var insertFun: FunSpec? = null
     rPF_Insert?.let {
-        insertFun = FunSpec.builder(it.simpleName)
-            .addModifiers(KModifier.OPEN)
-            .addCode(
-                """
+        if (insertParameter != null) {
+            insertFun = FunSpec.builder(it.simpleName)
+                .addModifiers(KModifier.OPEN)
+                .addParameter(className.lowercase(), insertParameter!!)
+                .addCode(
+                    """
                             launch {
                                 val ${className.lowercase()} = init$className()
                 
-                                val id = ${Variables.repository}.${it.simpleName}(user)
+                                val id = ${Variables.repository}.${it.simpleName}(${className.lowercase()})
                 
                                 if (id > 0) {
                                     Log.d("Rapid Prototype", "Saved")
@@ -498,8 +516,29 @@ fun generateRapidPrototypeDatabase(
                                 }
                             }
                         """.trimIndent()
-            )
-            .build()
+                )
+                .build()
+        }
+        else {
+            insertFun = FunSpec.builder(it.simpleName)
+                .addModifiers(KModifier.OPEN)
+                .addCode(
+                    """
+                            launch {
+                                val ${className.lowercase()} = init$className()
+                
+                                val id = ${Variables.repository}.${it.simpleName}()
+                
+                                if (id > 0) {
+                                    Log.d("Rapid Prototype", "Saved")
+                                } else {
+                                    Log.d("Rapid Prototype", "Not saved")
+                                }
+                            }
+                        """.trimIndent()
+                )
+                .build()
+        }
     }
     //INSERT
 
@@ -556,13 +595,24 @@ fun generateRapidPrototypeDatabase(
         viewModelBuilder
             .addFunction(it)
 
-        fabInsert = """
+        if (insertParameter != null) {
+            fabInsert = """
+                {
+                    FloatingActionButton(onClick = { ${Variables.viewModel}.${rPF_Insert!!.simpleName}(${Variables.whatToInsert}) }) {
+                        Icon(imageVector = Icons.Default.Add, contentDescription = null)
+                    }
+                },
+            """.trimIndent()
+        }
+        else {
+            fabInsert = """
                 {
                     FloatingActionButton(onClick = { ${Variables.viewModel}.${rPF_Insert!!.simpleName}() }) {
                         Icon(imageVector = Icons.Default.Add, contentDescription = null)
                     }
                 },
             """.trimIndent()
+        }
     }
 
     var iconDelete = ""
@@ -587,7 +637,6 @@ fun generateRapidPrototypeDatabase(
 
     viewModelBuilder
         .addFunction(setDetailFun)
-        .addFunction(generateModelInitFunction(properties, ClassName(packageName, className)))
         .addFunction(
             FunSpec.builder(Elements.RandomString.name)
                 .returns(String::class)
@@ -637,6 +686,13 @@ fun generateRapidPrototypeDatabase(
 
     screenBuilder
         .addAnnotation(ClassNames.composableClass)
+
+    if (insertParameter != null) {
+        screenBuilder
+            .addParameter(Variables.whatToInsert, insertParameter)
+    }
+
+    screenBuilder
         .addStatement(
             "val ${Variables.viewModel} = %T<${className}ViewModel>()",
             ClassNames.hiltViewModelClass
@@ -810,40 +866,6 @@ fun createSetDetailFunSpec(className: String, packageName: String): FunSpec {
                             ${Variables.uiState}.value.data!!.detail = ${className.lowercase()}
                         """.trimIndent()
         )
-        .build()
-}
-
-
-fun generateModelInitFunction(properties: Sequence<KSPropertyDeclaration>, dataClass: ClassName): FunSpec {
-    val codeBlockBuilder = CodeBlock.builder()
-        .add("return %T(\n", dataClass)
-
-    properties.forEachIndexed { index, property ->
-        if (property.simpleName.asString() != "id") {
-            val typeName = property.type.resolve().declaration.qualifiedName?.asString()
-            val isLastProperty = index == properties.count() - 1
-
-            val defaultValue = when {
-                typeName == "kotlin.String" -> "randomString()"
-                typeName == "kotlin.Int" || typeName == "kotlin.Long" -> "(1..100).random()"
-                typeName == "kotlin.Float" || typeName == "kotlin.Double" -> "Random.nextFloat()"
-                typeName?.startsWith("kotlin.collections.List") == true -> "${Elements.RandomList.name}(typeName)"
-                else -> "null"
-            }
-
-            codeBlockBuilder.add("    %L = %L", property.simpleName.asString(), defaultValue)
-
-            if (!isLastProperty) {
-                codeBlockBuilder.add(",\n")
-            }
-        }
-    }
-
-    codeBlockBuilder.add(")")
-
-    return FunSpec.builder("init${dataClass.simpleName}")
-        .returns(dataClass)
-        .addCode(codeBlockBuilder.build())
         .build()
 }
 

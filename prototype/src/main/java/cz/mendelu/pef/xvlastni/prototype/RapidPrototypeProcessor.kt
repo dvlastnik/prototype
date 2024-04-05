@@ -21,6 +21,7 @@ import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.PropertySpec
 import com.squareup.kotlinpoet.TypeSpec
 import com.squareup.kotlinpoet.asClassName
+import com.squareup.kotlinpoet.asTypeName
 import cz.mendelu.pef.xvlastni.prototype.constants.Elements
 import cz.mendelu.pef.xvlastni.prototype.annotations.RapidPrototype
 import cz.mendelu.pef.xvlastni.prototype.annotations.RapidPrototypeFunction
@@ -200,6 +201,7 @@ class RapidPrototypeProcessor(
                     rPF_Insert,
                     rPF_Delete,
                     properties,
+                    insertParameter,
                     repository,
                     viewModelBuilder,
                     screenContentBuilder,
@@ -209,7 +211,7 @@ class RapidPrototypeProcessor(
                 )
             }
             else if (isList == true && type == RapidPrototypeType.API) {
-                generateRapidPrototypeApi(
+                generateRapidPrototypeApiList(
                     packageName,
                     className,
                     fileName,
@@ -229,6 +231,154 @@ class RapidPrototypeProcessor(
                     bottomSheetContentBuilder,
                     codeGenerator
                 )
+            }
+            else if (isList == false && type == RapidPrototypeType.API) {
+                //data class is not needed
+
+                //UISTATE
+                val uiStateTypeName = uiStateClass
+                    .parameterizedBy(
+                        ClassName(packageName, className), errorClass
+                    )
+
+                val mutableStateTypeName = ClassNames.mutableStateClass
+                    .parameterizedBy(uiStateTypeName)
+
+                val uiStateProperty = PropertySpec.builder(Variables.uiState, mutableStateTypeName)
+                    .initializer("%T(UiState())", ClassNames.mutableStateOfClass)
+                    .build()
+                //UISTATE
+
+                requireNotNull(repository) { "Repository is not annotated" }
+                requireNotNull(rPF_Select) { "Get call is not annotated" }
+
+                //SELECT - GET
+                var selectFun: FunSpec? = null
+                rPF_Select?.let {
+                    selectFun = FunSpec.builder(it.simpleName)
+                        .addCode("""
+                            %T {
+                                val result = %T(%T.IO) {
+                                    ${Variables.repository}.${it.simpleName}()
+                                }
+                                
+                                when(result) {
+                                    is CommunicationResult.CommunicationError ->
+                                        ${Variables.uiState}.value = UiState(loading = false, data = null, errors = %T(code = 0 ,message = %S))
+                                    is CommunicationResult.Error ->
+                                        ${Variables.uiState}.value = UiState(loading = false, data = null, errors = Error(code = 1, message = %S))
+                                    is CommunicationResult.Exception ->
+                                        ${Variables.uiState}.value = UiState(loading = false, data = null, errors = Error(code = 2, message = %S))
+                                    is CommunicationResult.Success ->
+                                        ${Variables.uiState}.value = UiState(loading = false, data = result.data, errors = null)
+                                }
+                            }
+                        """.trimIndent(),
+                            ClassNames.launchClass,
+                            ClassNames.withContextClass,
+                            ClassNames.dispatchersClass,
+                            ClassName(packageName + Elements.Error.packageName, Elements.Error.name),
+                            "No internet",
+                            "Failed to load the list",
+                            "Unknown error"
+                        )
+                        .build()
+                }
+                //SELECT - GET
+
+                viewModelBuilder
+                    .addAnnotation(ClassNames.daggerHiltViewModelClass)
+                    .primaryConstructor(FunSpec.constructorBuilder()
+                        .addAnnotation(ClassNames.injectClass)
+                        .addParameter(Variables.repository, repository!!)
+                        .build())
+                    .superclass(ClassName(packageName + Elements.BaseViewModel.packageName, Elements.BaseViewModel.name))
+                    .addProperty(PropertySpec.builder(Variables.repository, repository!!, KModifier.PRIVATE).initializer(Variables.repository).build())
+                    .addProperty(uiStateProperty)
+
+                screenContentBuilder
+                    .addAnnotation(ClassNames.composableClass)
+                    .addParameter(
+                        Variables.uiState,
+                        uiStateTypeName
+                    )
+                    .addParameter(Variables.paddingValues, ClassNames.paddingValuesClass)
+                    .beginControlFlow("""
+                        %T(
+                            modifier = %T
+                                .fillMaxSize()
+                                .%T(all = basicMargin()),
+                            horizontalAlignment = %T.CenterHorizontally,
+                            verticalArrangement = %T.Center
+                        )
+                    """.trimIndent(),
+                        ClassNames.columnClass,
+                        ClassNames.modifierClass,
+                        ClassNames.paddingClass,
+                        ClassNames.alignmentClass,
+                        ClassNames.arrangementClass
+                    )
+                    .beginControlFlow("if (${Variables.uiState}.value.data == null)")
+                    .addStatement("%T(text = %S)", ClassNames.textClass, "nothing in there")
+                    .endControlFlow()
+                    .beginControlFlow("else")
+
+                properties.forEach { property ->
+                    val propertyName = property.simpleName.asString()
+                    screenContentBuilder
+                        .addStatement("%T(trailing = %S, leading = ${Variables.uiState}.data!!.%L.toString()", ClassName(Elements.RapidRow.packageName, Elements.RapidRow.name), propertyName, propertyName)
+                }
+
+                screenContentBuilder
+                    .endControlFlow()
+                    .endControlFlow()
+
+                screenBuilder
+                    .addAnnotation(ClassNames.composableClass)
+                    .addStatement("val ${Variables.viewModel} = %T<${className}ViewModel>()", ClassNames.hiltViewModelClass)
+                    .addStatement("")
+                    .beginControlFlow(
+                        "val ${Variables.uiState}: %T<%T<$className, %T>> = %T",
+                        ClassNames.mutableStateClass,
+                        uiStateClass,
+                        errorClass,
+                        ClassNames.rememberSaveableClass
+                    )
+                    .addStatement("%T(%T())", ClassNames.mutableStateOfClass, uiStateClass)
+                    .endControlFlow()
+                    .addStatement("")
+                    .beginControlFlow("${Variables.viewModel}.${Variables.uiState}.value.let")
+                    .addStatement("${Variables.uiState}.value = it")
+                    .endControlFlow()
+                    .addStatement("")
+                    .addCode("""
+                        ${Elements.BaseScreen.name}(
+                            topBarText = %S,
+                            drawFullScreenContent = false,
+                            showLoading = ${Variables.uiState}.value.loading,
+                            placeholderScreenContent = if (${Variables.uiState}.value.errors != null) {
+                                ${Elements.PlaceholderScreen.name}Content(null, %T(text = ${Variables.uiState}.value.errors!!.message))
+                            }
+                            else {
+                                null
+                            },
+                            floatingActionButton = {
+                                %T(onClick = { ${Variables.viewModel}.${rPF_Select!!.simpleName}() }) {
+                                    %T(imageVector = Icons.Default.Refresh, contentDescription = null)
+                                }
+                            },
+                            actions = {},
+                            bottomContent = {},
+                            showBottomSheet = %T(false),
+                            bottomSheetContent = {}
+                        )   
+                    """.trimIndent(),
+                            className,
+                            ClassNames.textClass,
+                            ClassNames.floatingActionButtonClass,
+                            ClassNames.iconClass,
+                            ClassNames.mutableStateOfClass
+                        )
             }
 
             val fileSpec = FileSpec.builder(packageName, fileName)
