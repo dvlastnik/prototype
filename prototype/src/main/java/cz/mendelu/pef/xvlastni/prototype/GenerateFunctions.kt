@@ -17,6 +17,174 @@ import cz.mendelu.pef.xvlastni.prototype.constants.ClassNames
 import cz.mendelu.pef.xvlastni.prototype.constants.Elements
 import cz.mendelu.pef.xvlastni.prototype.constants.Variables
 
+fun generateRapidPrototypeApi(
+    packageName: String,
+    className: String,
+    fileName: String,
+    uiStateClass: ClassName,
+    errorClass: ClassName,
+    repository: ClassName?,
+    rPF_Select: ClassName?,
+    properties: Sequence<KSPropertyDeclaration>,
+    viewModelBuilder: TypeSpec.Builder,
+    screenContentBuilder: FunSpec.Builder,
+    screenBuilder: FunSpec.Builder
+) {
+    //data class is not needed
+
+    //UISTATE
+    val uiStateTypeName = uiStateClass
+        .parameterizedBy(
+            ClassName(packageName, className), errorClass
+        )
+
+    val mutableStateTypeName = ClassNames.mutableStateClass
+        .parameterizedBy(uiStateTypeName)
+
+    val uiStateProperty = PropertySpec.builder(Variables.uiState, mutableStateTypeName)
+        .initializer("%T(UiState())", ClassNames.mutableStateOfClass)
+        .build()
+    //UISTATE
+
+    requireNotNull(repository) { "Repository is not annotated" }
+    requireNotNull(rPF_Select) { "Get call is not annotated" }
+
+    //SELECT - GET
+    var selectFun: FunSpec? = null
+    rPF_Select?.let {
+        selectFun = FunSpec.builder(it.simpleName)
+            .addCode("""
+                            %T {
+                                val result = %T(%T.IO) {
+                                    ${Variables.repository}.${it.simpleName}()
+                                }
+                                
+                                when(result) {
+                                    is CommunicationResult.CommunicationError ->
+                                        ${Variables.uiState}.value = UiState(loading = false, data = null, errors = %T(code = 0 ,message = %S))
+                                    is CommunicationResult.Error ->
+                                        ${Variables.uiState}.value = UiState(loading = false, data = null, errors = Error(code = 1, message = %S))
+                                    is CommunicationResult.Exception ->
+                                        ${Variables.uiState}.value = UiState(loading = false, data = null, errors = Error(code = 2, message = %S))
+                                    is CommunicationResult.Success ->
+                                        ${Variables.uiState}.value = UiState(loading = false, data = result.data, errors = null)
+                                }
+                            }
+                        """.trimIndent(),
+                ClassNames.launchClass,
+                ClassNames.withContextClass,
+                ClassNames.dispatchersClass,
+                ClassName(packageName + Elements.Error.packageName, Elements.Error.name),
+                "No internet",
+                "Failed to load the list",
+                "Unknown error"
+            )
+            .build()
+    }
+    //SELECT - GET
+
+    viewModelBuilder
+        .addAnnotation(ClassNames.daggerHiltViewModelClass)
+        .primaryConstructor(FunSpec.constructorBuilder()
+            .addAnnotation(ClassNames.injectClass)
+            .addParameter(Variables.repository, repository!!)
+            .build())
+        .superclass(ClassName(packageName + Elements.BaseViewModel.packageName, Elements.BaseViewModel.name))
+        .addProperty(PropertySpec.builder(Variables.repository, repository!!, KModifier.PRIVATE).initializer(Variables.repository).build())
+        .addProperty(uiStateProperty)
+        .addFunction(selectFun!!)
+
+
+    screenContentBuilder
+        .addAnnotation(ClassNames.composableClass)
+        .addParameter(
+            Variables.uiState,
+            uiStateTypeName
+        )
+        .addParameter(Variables.paddingValues, ClassNames.paddingValuesClass)
+        .beginControlFlow("""
+                        %T(
+                            modifier = %T
+                                .fillMaxSize()
+                                .%T(all = basicMargin()),
+                            horizontalAlignment = %T.CenterHorizontally,
+                            verticalArrangement = %T.Center
+                        )
+                    """.trimIndent(),
+            ClassNames.columnClass,
+            ClassNames.modifierClass,
+            ClassNames.paddingClass,
+            ClassNames.alignmentClass,
+            ClassNames.arrangementClass
+        )
+        .beginControlFlow("if (${Variables.uiState}.data == null)")
+        .addStatement("%T(text = %S)", ClassNames.textClass, "nothing in there")
+        .endControlFlow()
+        .beginControlFlow("else")
+
+    properties.forEach { property ->
+        val propertyName = property.simpleName.asString()
+        screenContentBuilder
+            .addStatement("RapidRow(trailing = %S, leading = ${Variables.uiState}.data!!.%L.toString())", propertyName, propertyName)
+    }
+
+    screenContentBuilder
+        .endControlFlow()
+        .endControlFlow()
+
+    screenBuilder
+        .addAnnotation(ClassNames.composableClass)
+        .addStatement("val ${Variables.viewModel} = %T<${className}ViewModel>()", ClassNames.hiltViewModelClass)
+        .addStatement("")
+        .beginControlFlow(
+            "val ${Variables.uiState}: %T<%T<$className, %T>> = %T",
+            ClassNames.mutableStateClass,
+            uiStateClass,
+            errorClass,
+            ClassNames.rememberSaveableClass
+        )
+        .addStatement("%T(%T())", ClassNames.mutableStateOfClass, uiStateClass)
+        .endControlFlow()
+        .addStatement("")
+        .beginControlFlow("${Variables.viewModel}.${Variables.uiState}.value.let")
+        .addStatement("${Variables.uiState}.value = it")
+        .endControlFlow()
+        .addStatement("")
+        .addCode("""
+                        ${Elements.BaseScreen.name}(
+                            topBarText = %S,
+                            drawFullScreenContent = false,
+                            showLoading = ${Variables.uiState}.value.loading,
+                            placeholderScreenContent = if (${Variables.uiState}.value.errors != null) {
+                                ${Elements.PlaceholderScreen.name}Content(null, ${Variables.uiState}.value.errors!!.message!!)
+                            }
+                            else {
+                                null
+                            },
+                            floatingActionButton = {
+                                %T(onClick = { ${Variables.viewModel}.${rPF_Select!!.simpleName}() }) {
+                                    %T(imageVector = Icons.Default.Refresh, contentDescription = null)
+                                }
+                            },
+                            actions = {},
+                            bottomContent = {},
+                            showBottomSheet = %T(false),
+                            bottomSheetContent = {}
+                        )   
+                    """.trimIndent(),
+            className,
+            ClassNames.floatingActionButtonClass,
+            ClassNames.iconClass,
+            ClassNames.mutableStateOfClass
+        )
+        .beginControlFlow("")
+        .addStatement(
+            "%T(${Variables.uiState} = ${Variables.uiState}.value, ${Variables.paddingValues} = it)",
+            ClassName(packageName, fileName + "Content")
+        )
+        .endControlFlow()
+}
+
 fun generateRapidPrototypeApiList(
     packageName: String,
     className: String,
@@ -54,7 +222,8 @@ fun generateRapidPrototypeApiList(
         .build()
     //UISTATE
 
-    requireNotNull(repository) { "Repository is not annotated" }
+    requireNotNull(repository) { "Repository is not annotated!" }
+    requireNotNull(rPF_Select) { "At least GET function must be annotated!" }
 
     //SELECT - GET
     var fabOnClick = ""
@@ -64,7 +233,6 @@ fun generateRapidPrototypeApiList(
         fabOnClick = "${Variables.viewModel}.${it.simpleName}()"
 
         selectFun = FunSpec.builder(it.simpleName)
-            .addModifiers(KModifier.OPEN)
             .addCode("""
                         %T {
                             val result = %T(%T.IO) {
@@ -104,7 +272,6 @@ fun generateRapidPrototypeApiList(
             fabOnClick = "${Variables.viewModel}.${it.simpleName}(${Variables.whatToInsert})"
             insertFun = FunSpec.builder(it.simpleName)
                 .addParameter(className.lowercase(), insertParameter!!)
-                .addModifiers(KModifier.OPEN)
                 .addCode(
                     """
                                 %T {
@@ -143,7 +310,6 @@ fun generateRapidPrototypeApiList(
             fabOnClick = "${Variables.viewModel}.${it.simpleName}()"
 
             insertFun = FunSpec.builder(it.simpleName)
-                .addModifiers(KModifier.OPEN)
                 .addCode(
                     """
                                 %T {
@@ -188,7 +354,6 @@ fun generateRapidPrototypeApiList(
         if (deleteParameter != null) {
             deleteFun = FunSpec.builder(it.simpleName)
                 .addParameter(className.lowercase(), deleteParameter!!)
-                .addModifiers(KModifier.OPEN)
                 .addCode(
                     """
                                 %T {
@@ -225,7 +390,6 @@ fun generateRapidPrototypeApiList(
         }
         else {
             deleteFun = FunSpec.builder(it.simpleName)
-                .addModifiers(KModifier.OPEN)
                 .addCode(
                     """
                                 %T {
@@ -449,6 +613,9 @@ fun generateRapidPrototypeDatabase(
     bottomSheetContentBuilder: FunSpec.Builder,
     codeGenerator: CodeGenerator
 ) {
+    requireNotNull(repository) { "Repository is not annotated" }
+    requireNotNull(rPF_Select) { "At least SELECT function must be annotated!" }
+
     // data class
     val dataClass = generateDataClass(packageName, className, codeGenerator)
     // viewModel
@@ -470,7 +637,6 @@ fun generateRapidPrototypeDatabase(
     var selectFun: FunSpec? = null
     rPF_Select?.let {
         selectFun = FunSpec.builder(it.simpleName)
-            .addModifiers(KModifier.OPEN)
             .addCode(
                 """
                             %T {
@@ -479,7 +645,7 @@ fun generateRapidPrototypeDatabase(
                                         ${Variables.uiState}.value = UiState(loading = true, data = null, errors = null)
                                     }
                                     .%T {
-                                        ${Variables.uiState}.value = UiState(loading = false, data = null, errors = %T(0, it.localizedMessage))
+                                        ${Variables.uiState}.value = UiState(loading = false, data = null, errors = Error(0, it.localizedMessage))
                                     }
                                     .collect {
                                         ${Variables.uiState}.value = UiState(loading = false, data = ${dataClass.simpleName}(list = it, detail = null), errors = null)
@@ -488,8 +654,7 @@ fun generateRapidPrototypeDatabase(
                         """.trimIndent(),
                 ClassNames.launchClass,
                 ClassNames.flowOnStartClass,
-                ClassNames.flowCatchClass,
-                ClassName("cz.mendelu.pef.xvlastni.prototype.classes", "Error")
+                ClassNames.flowCatchClass
             )
             .build()
     }
@@ -500,13 +665,10 @@ fun generateRapidPrototypeDatabase(
     rPF_Insert?.let {
         if (insertParameter != null) {
             insertFun = FunSpec.builder(it.simpleName)
-                .addModifiers(KModifier.OPEN)
                 .addParameter(className.lowercase(), insertParameter!!)
                 .addCode(
                     """
                             launch {
-                                val ${className.lowercase()} = init$className()
-                
                                 val id = ${Variables.repository}.${it.simpleName}(${className.lowercase()})
                 
                                 if (id > 0) {
@@ -521,7 +683,6 @@ fun generateRapidPrototypeDatabase(
         }
         else {
             insertFun = FunSpec.builder(it.simpleName)
-                .addModifiers(KModifier.OPEN)
                 .addCode(
                     """
                             launch {
@@ -546,7 +707,6 @@ fun generateRapidPrototypeDatabase(
     var deleteFun: FunSpec? = null
     rPF_Delete?.let {
         deleteFun = FunSpec.builder(it.simpleName)
-            .addModifiers(KModifier.OPEN)
             .addParameter(className.lowercase(), ClassName(packageName, className))
             .addCode(
                 """
@@ -562,8 +722,6 @@ fun generateRapidPrototypeDatabase(
     //SET DETAIL
     val setDetailFun = createSetDetailFunSpec(className, packageName)
     //SET DETAIL
-
-    requireNotNull(repository) { "Repository is not annotated" }
 
     viewModelBuilder
         .addAnnotation(ClassNames.daggerHiltViewModelClass)
@@ -637,19 +795,6 @@ fun generateRapidPrototypeDatabase(
 
     viewModelBuilder
         .addFunction(setDetailFun)
-        .addFunction(
-            FunSpec.builder(Elements.RandomString.name)
-                .returns(String::class)
-                .addCode(Elements.RandomString.content)
-                .build()
-        )
-        .addFunction(
-            FunSpec.builder(Elements.RandomList.name)
-                .addParameter("typeName", String::class)
-                .returns(String::class)
-                .addCode(Elements.RandomList.content)
-                .build()
-        )
         .build()
 
     var titleIndex = 0
@@ -859,7 +1004,6 @@ fun createBottomSheetContent(
 
 fun createSetDetailFunSpec(className: String, packageName: String): FunSpec {
     return FunSpec.builder("set${className}Detail")
-        .addModifiers(KModifier.OPEN)
         .addParameter(className.lowercase(), ClassName(packageName, className))
         .addCode(
             """
