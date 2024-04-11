@@ -37,7 +37,7 @@ Add KSP to your app module build.gradle:
 ```
 
 ### Example use (for database)
-1. Annotate your data class
+#### 1. Annotate your data class
  - Annotate with '@RapidPrototype'
  - Available types are 'RapidPrototype.API' and 'RapidPrototypeType.DATABASE'
  - isList = false is available only for API, because why database without list?
@@ -67,7 +67,7 @@ data class Activity(
 }
 ```
 
-2. Annotate your Repository
+#### 2. Annotate your Repository
  - Use repository pattern
  - Annotate it with '@RapidPrototypeRepository'
  - Annotate your repository functions with '@RapidPrototypeFunction'
@@ -92,10 +92,10 @@ interface IAppRepository {
 }
 ```
 
-3. Build your app
+#### 3. Build your app
  - After build, screen is generated, can be found at 'build/generated/ksp/<debug or release>'
 
-4. Use screen in MainActivity
+#### 4. Use screen in MainActivity
  - Add generated screen to main activity
  - If you annotated INSERT function, you have to fill 'whatToInsert' parameter, basically it defines default Object that will be inserted everytime you press add button
 
