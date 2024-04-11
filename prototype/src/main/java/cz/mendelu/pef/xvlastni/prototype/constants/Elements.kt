@@ -3,8 +3,149 @@ package cz.mendelu.pef.xvlastni.prototype.constants
 import com.squareup.kotlinpoet.ClassName
 
 object Elements {
+    object RandomList {
+        val name = "randomList"
+        val content = """
+            return if (typeName.contains("String")) {
+                "listOf(${RandomString.name}(), ${RandomString.name}(), ${RandomString.name}())"
+            }
+            else if (typeName.contains("Int") || typeName.contains("Long")) {
+                "listOf((0..100).random(), (0..100).random(), (0..100).random())"
+            }
+            else if (typeName.contains("Float") || typeName.contains("Double")) {
+                "listOf(Random.nextFloat(), Random.nextFloat(), Random.nextFloat())"
+            }
+            else {
+                "listOf()"
+            }
+        """.trimIndent()
+    }
+    object RandomString {
+        val name = "randomString"
+        val content = """
+                val chars = ('A'..'Z') + ('a'..'z') + ('0'..'9')
+                return (1..6)
+                    .map {
+                        chars.random()
+                    }
+                    .joinToString("")
+        """.trimIndent()
+    }
+    object UiState {
+        val name = "UiState"
+        val packageName = ".model"
+        val content = """
+            import java.io.Serializable
+
+            open class UiState<T, E>
+                (
+                var loading: Boolean = true,
+                var data: T? = null,
+                var errors: E? = null) : Serializable {
+            }
+        """.trimIndent()
+    }
+    object Error {
+        val name = "Error"
+        val packageName = ".architecture"
+        val content = """
+            data class Error(
+                val code: Int,
+                val message: String?
+            )
+        """.trimIndent()
+    }
+    object BaseViewModel {
+        val name = "BaseViewModel"
+        val packageName = ".architecture"
+        val content = """
+            import androidx.lifecycle.ViewModel
+            import kotlinx.coroutines.CoroutineScope
+            import kotlinx.coroutines.Dispatchers
+            import kotlinx.coroutines.Job
+            import kotlin.coroutines.CoroutineContext
+
+            abstract class BaseViewModel : ViewModel(), CoroutineScope {
+                private val job = Job()
+                override val coroutineContext: CoroutineContext = Dispatchers.Main + job
+            }
+        """.trimIndent()
+    }
+    object RapidListRow {
+        val name = "RapidListRow"
+        val packageName = ".elements"
+        val content = """
+            import androidx.compose.foundation.clickable
+            import androidx.compose.foundation.layout.Arrangement
+            import androidx.compose.foundation.layout.Column
+            import androidx.compose.foundation.layout.Row
+            import androidx.compose.foundation.layout.fillMaxWidth
+            import androidx.compose.foundation.layout.padding
+            import androidx.compose.material.icons.Icons
+            import androidx.compose.material.icons.filled.ArrowForward
+            import androidx.compose.material3.Icon
+            import androidx.compose.material3.Text
+            import androidx.compose.runtime.Composable
+            import androidx.compose.runtime.MutableState
+            import androidx.compose.ui.Alignment
+            import androidx.compose.ui.Modifier
+            import androidx.compose.ui.res.painterResource
+            import androidx.compose.ui.text.style.TextOverflow
+            import androidx.compose.ui.unit.dp
+            import androidx.compose.ui.text.TextStyle
+            import androidx.compose.ui.text.font.FontWeight
+            import androidx.compose.ui.unit.sp
+            
+            @Composable
+            fun RapidListRow(
+                title: String,
+                subtitle: String,
+                modifier: Modifier = Modifier
+            ) {
+                Row(
+                    modifier = modifier
+                        .fillMaxWidth()
+                        .padding(start = 16.dp, top = 8.dp, end = 8.dp, bottom = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(end = 8.dp)
+                    ) {
+                        Text(
+                            text = title, 
+                            maxLines = 1, 
+                            overflow = TextOverflow.Ellipsis, 
+                            style = TextStyle(
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 16.sp
+                            )
+                        )
+                        
+                        Text(
+                            text = subtitle, 
+                            maxLines = 1, 
+                            overflow = TextOverflow.Ellipsis, 
+                            style = TextStyle(
+                                fontSize = 16.sp
+                            )
+                        )
+                    }
+                    
+                    Icon(
+                        imageVector = Icons.Default.ArrowForward,
+                        contentDescription = null,
+                        modifier = Modifier.padding(end = 8.dp)
+                    )
+                }
+            }
+        """.trimIndent()
+    }
     object RapidRow {
         val name = "RapidRow"
+        val packageName = ".elements"
         val content = """
             import androidx.compose.foundation.layout.Column
             import androidx.compose.foundation.layout.Row
@@ -64,8 +205,8 @@ object Elements {
     }
     object BaseScreen {
         val name = "BaseScreen"
+        val packageName = ".elements"
         val content = """
-            import android.annotation.SuppressLint
             import androidx.compose.foundation.layout.*
             import androidx.compose.foundation.lazy.LazyColumn
             import androidx.compose.material.icons.Icons
@@ -81,7 +222,6 @@ object Elements {
             import androidx.compose.ui.unit.dp
 
             @OptIn(ExperimentalMaterial3Api::class)
-            @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
             @Composable
             fun BaseScreen(
                 topBarText: String?,
@@ -207,6 +347,7 @@ object Elements {
 
     object PlaceholderScreen {
         val name = "PlaceholderScreen"
+        val packageName = ".elements"
         val content = """
             import androidx.compose.foundation.Image
             import androidx.compose.foundation.layout.*
@@ -259,6 +400,7 @@ object Elements {
 
     object LoadingScreen {
         val name = "LoadingScreen"
+        val packageName = ".elements"
         val content = """
             import androidx.compose.foundation.background
             import androidx.compose.foundation.layout.Arrangement
@@ -293,6 +435,7 @@ object Elements {
 
     object Dimensions {
         val name = "Dimensions"
+        val packageName = ".elements"
         val content = """
             import androidx.compose.runtime.Composable
             import androidx.compose.ui.unit.Dp

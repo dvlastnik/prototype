@@ -1,24 +1,23 @@
-package cz.mendelu.pef.xvlastni.compose_rapid_prototyping.architecture
+package cz.mendelu.pef.xvlastni.prototype.classes
 
-import com.google.gson.JsonIOException
 import retrofit2.Response
 import java.io.IOException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 
 interface IBaseRemoteRepository {
-    suspend fun <T: Any>processResponse(response: suspend () -> Response<T>): CommunitationResult<T> {
+    suspend fun <T: Any>processResponse(response: suspend () -> Response<T>): CommunicationResult<T> {
         try {
             val responseVal = response.invoke()
 
             if (responseVal.isSuccessful) {
                 if (responseVal.body() != null) {
                     //vsecko ok
-                    return CommunitationResult.Success(responseVal.body()!!)
+                    return CommunicationResult.Success(responseVal.body()!!)
                 }
                 else {
                     //neco je nahovno
-                    return CommunitationResult.Error(
+                    return CommunicationResult.Error(
                         Error(
                             responseVal.code(),
                             responseVal.errorBody().toString()
@@ -26,7 +25,7 @@ interface IBaseRemoteRepository {
                     )
                 }
             } else {
-                return CommunitationResult.Error(
+                return CommunicationResult.Error(
                     Error(
                         responseVal.code(),
                         responseVal.errorBody().toString()
@@ -36,19 +35,19 @@ interface IBaseRemoteRepository {
         }
         catch (ex: UnknownHostException) {
             print(ex.stackTraceToString())
-            return CommunitationResult.CommunicationError()
+            return CommunicationResult.CommunicationError()
         }
         catch (ex: SocketTimeoutException) {
             print(ex.stackTraceToString())
-            return CommunitationResult.CommunicationError()
+            return CommunicationResult.CommunicationError()
         }
         catch (ex: IOException) {
             print(ex.stackTraceToString())
-            return CommunitationResult.Exception(ex)
+            return CommunicationResult.Exception(ex)
         }
         catch (ex: Exception) {
             print(ex.stackTraceToString())
-            return CommunitationResult.Exception(ex)
+            return CommunicationResult.Exception(ex)
         }
     }
 }
