@@ -9,10 +9,14 @@ dependencies {
     implementation("com.squareup:kotlinpoet:1.15.2")
 }
 
-afterEvaluate {
-    publishing {
-        publications {
+publishing {
+    publications {
+        create<MavenPublication>("maven") {
+            groupId = "com.github.dvlastnik"
+            artifactId = "compose-rapid-prototyping"
+            version = "1.0.0"
 
+            from(components["java"])
         }
     }
 }
