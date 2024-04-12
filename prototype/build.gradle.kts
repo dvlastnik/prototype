@@ -9,14 +9,21 @@ dependencies {
     implementation("com.squareup:kotlinpoet:1.15.2")
 }
 
+group = "com.github.dvlastnik"
+version = "1.0.1"
+
 publishing {
     publications {
-        create<MavenPublication>("maven") {
-            groupId = "com.github.dvlastnik"
-            artifactId = "compose-rapid-prototyping"
-            version = "1.0.0"
-
+        create<MavenPublication>("mavenJava") {
             from(components["java"])
+
+            groupId = "com.github.dvlastnik"
+            artifactId = "prototype"
+            version = "1.0.1"
         }
     }
+}
+
+tasks.publishToMavenLocal {
+    dependsOn("build")
 }
