@@ -51,6 +51,7 @@ Finally add dependency of this library:
 ```build.gradle.kts
 dependencies {
     implementation("com.github.dvlastnik:prototype:v1.0.2")
+    ksp("com.github.dvlastnik:prototype:v1.0.2")
 }
 ```
 
