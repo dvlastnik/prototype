@@ -36,6 +36,24 @@ Add KSP to your app module build.gradle:
     id("com.google.devtools.ksp") version "<ksp_version>"
 ```
 
+Because library is stored at Jitpack.io, you have to add this in your 'settings.gradle.kts':
+```settings.gradle.kts
+dependencyResolutionManagement {
+	repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+	repositories {
+		mavenCentral()
+		maven { url = uri("https://jitpack.io") }
+	}
+}
+```
+
+Finally add dependency of this library:
+```build.gradle.kts
+dependencies {
+    implementation("com.github.dvlastnik:prototype:v1.0.2")
+}
+```
+
 ### Example use (for database)
 #### 1. Annotate your data class
  - Annotate with '@RapidPrototype'
