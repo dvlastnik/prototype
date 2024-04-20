@@ -169,12 +169,6 @@ class RapidPrototypeProcessor(
                 codeGenerator = codeGenerator
             )
             generateFile(
-                content = Elements.Error.content,
-                packageName = "$packageName${Elements.Error.packageName}",
-                fileName = Elements.Error.name,
-                codeGenerator = codeGenerator
-            )
-            generateFile(
                 content = Elements.UiState.content,
                 packageName = "$packageName${Elements.UiState.packageName}",
                 fileName = Elements.UiState.name,

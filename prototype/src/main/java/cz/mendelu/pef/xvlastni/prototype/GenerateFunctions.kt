@@ -74,7 +74,7 @@ fun generateRapidPrototypeApi(
                 ClassNames.launchClass,
                 ClassNames.withContextClass,
                 ClassNames.dispatchersClass,
-                ClassName(packageName + Elements.Error.packageName, Elements.Error.name),
+                errorClass,
                 "No internet",
                 "Failed to load the list",
                 "Unknown error"
@@ -254,7 +254,7 @@ fun generateRapidPrototypeApiList(
                 ClassNames.launchClass,
                 ClassNames.withContextClass,
                 ClassNames.dispatchersClass,
-                ClassName(packageName + Elements.Error.packageName, Elements.Error.name),
+                errorClass,
                 "No internet",
                 "Failed to load the list",
                 "Unknown error",
@@ -296,10 +296,7 @@ fun generateRapidPrototypeApiList(
                     ClassNames.launchClass,
                     ClassNames.withContextClass,
                     ClassNames.dispatchersClass,
-                    ClassName(
-                        packageName + Elements.Error.packageName,
-                        Elements.Error.name
-                    ),
+                    errorClass,
                     "No internet",
                     "Failed to load the list",
                     "Unknown error"
@@ -334,10 +331,7 @@ fun generateRapidPrototypeApiList(
                     ClassNames.launchClass,
                     ClassNames.withContextClass,
                     ClassNames.dispatchersClass,
-                    ClassName(
-                        packageName + Elements.Error.packageName,
-                        Elements.Error.name
-                    ),
+                    errorClass,
                     "No internet",
                     "Failed to load the list",
                     "Unknown error",
@@ -378,10 +372,7 @@ fun generateRapidPrototypeApiList(
                     ClassNames.launchClass,
                     ClassNames.withContextClass,
                     ClassNames.dispatchersClass,
-                    ClassName(
-                        packageName + Elements.Error.packageName,
-                        Elements.Error.name
-                    ),
+                    errorClass,
                     "No internet",
                     "Failed to load the list",
                     "Unknown error"
@@ -414,10 +405,7 @@ fun generateRapidPrototypeApiList(
                     ClassNames.launchClass,
                     ClassNames.withContextClass,
                     ClassNames.dispatchersClass,
-                    ClassName(
-                        packageName + Elements.Error.packageName,
-                        Elements.Error.name
-                    ),
+                    errorClass,
                     "No internet",
                     "Failed to load the list",
                     "Unknown error",
